@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
-import { getExpert, getExpertReviews, getExpertStats, getCoursesByExpert } from '../data/mock'
+import { useBizData } from '../lib/useBizData'
 import CourseCard from '../components/CourseCard'
 
 function Stars({ n }: { n: number }) {
@@ -13,7 +13,16 @@ function Stars({ n }: { n: number }) {
 
 export default function AcademyExpertReviews() {
   const { expertId } = useParams()
+  const { getExpert, getExpertReviews, getExpertStats, getCoursesByExpert, loading } = useBizData()
   const expert = getExpert(expertId ?? '')
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
+        <div className="h-40 animate-pulse rounded-3xl bg-stone-100" />
+      </div>
+    )
+  }
 
   if (!expert) {
     return (

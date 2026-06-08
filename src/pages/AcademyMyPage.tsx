@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { COURSES, MY_PURCHASED_IDS, getExpert } from '../data/mock'
+import { MY_PURCHASED_IDS } from '../data/mock'
+import { useBizData } from '../lib/useBizData'
 
 type Tab = '수강 중' | '관심 강의'
 
 export default function AcademyMyPage() {
+  const { courses, getExpert } = useBizData()
   const [tab, setTab] = useState<Tab>('수강 중')
 
-  const purchased = COURSES.filter((c) => MY_PURCHASED_IDS.includes(c.id))
+  const purchased = courses.filter((c) => MY_PURCHASED_IDS.includes(c.id))
   // 관심 강의는 껍데기라 빈 상태 데모
   const list = tab === '수강 중' ? purchased : []
 
@@ -20,7 +22,7 @@ export default function AcademyMyPage() {
         </div>
         <div>
           <h1 className="text-xl font-black text-stone-900">관장님, 환영합니다</h1>
-          <p className="text-sm text-stone-500">grapplay.com@gmail.com · 비즈 구독 중</p>
+          <p className="text-sm text-stone-500">grapplay.com@gmail.com</p>
         </div>
         <div className="ml-auto hidden gap-6 text-center sm:flex">
           <div>

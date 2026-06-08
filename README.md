@@ -12,13 +12,34 @@
 - Vite 5
 - Tailwind CSS 4
 - React Router 6
+- Supabase (백엔드 — 그래플레이 운영 DB와 **분리된 별도 프로젝트**)
 
 ## 실행 방법
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
+cp .env.example .env   # 그리고 Supabase 키 입력 (아래 참고)
+npm run dev            # http://localhost:5173
 ```
+
+> 환경변수(`.env`)가 비어 있으면 앱은 자동으로 **목업 데이터**로 동작합니다.
+> 실제 데이터로 붙이려면 아래 백엔드 설정을 따르세요.
+
+## 백엔드 (Supabase)
+
+그래플레이 운영 DB와 **섞이지 않도록 비즈 전용 Supabase 프로젝트**를 따로 씁니다.
+
+1. `.env`에 비즈 프로젝트의 값 입력:
+   ```
+   VITE_SUPABASE_URL=https://xxxx.supabase.co
+   VITE_SUPABASE_ANON_KEY=eyJ...
+   ```
+2. 스키마/시드는 `supabase/` 폴더에 있습니다:
+   - `supabase/migrations/20260608000000_init_biz.sql` — 테이블 + RLS(읽기 공개)
+   - `supabase/seed.sql` — 목업과 동일한 시드 데이터
+3. 데이터 흐름: `src/lib/supabase.ts`(클라이언트) → `src/lib/api.ts`(쿼리 + 목업 폴백)
+   → `src/lib/useBizData.ts`(로드 훅) → 각 페이지.
+   현재 **읽기**만 연동돼 있고, 쓰기(에디터 저장/리뷰 작성)는 인증 연동 단계에서 추가 예정.
 
 기타 스크립트:
 

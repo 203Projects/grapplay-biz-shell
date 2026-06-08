@@ -21,10 +21,7 @@ export default function AcademyCourseEditor() {
   const [subtitle, setSubtitle] = useState(existing?.subtitle ?? '')
   const [category, setCategory] = useState<Category>(existing?.category ?? '마케팅')
 
-  // 판매 방식 (md §2.2 — is_subscription_excluded + price)
-  const [saleMode, setSaleMode] = useState<'subscription' | 'single'>(
-    existing?.isSubscriptionExcluded ? 'single' : 'subscription',
-  )
+  // 가격 (모든 강의 단품 판매)
   const [price, setPrice] = useState(String(existing?.price ?? 0))
 
   // 랜딩 페이지 (md §9.1 — use_landing_page + detail_blocks)
@@ -133,49 +130,32 @@ export default function AcademyCourseEditor() {
           </Field>
         </Section>
 
-        {/* 판매 방식 */}
-        <Section title="판매 방식">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <ModeCard
-              active={saleMode === 'subscription'}
-              onClick={() => setSaleMode('subscription')}
-              title="구독 포함"
-              desc="비즈 구독자가 무제한 시청"
-              icon="🔓"
-            />
-            <ModeCard
-              active={saleMode === 'single'}
-              onClick={() => setSaleMode('single')}
-              title="단품 판매"
-              desc="구독과 별도로 개별 구매"
-              icon="🛒"
-              accent
-            />
-          </div>
-          {saleMode === 'single' && (
-            <Field label="판매 가격 (원)">
-              <div className="relative max-w-xs">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-400">
-                  ₩
-                </span>
-                <input
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ''))}
-                  inputMode="numeric"
-                  className="w-full rounded-xl border border-stone-300 py-2.5 pl-8 pr-4 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-                />
-              </div>
-              {Number(price) > 0 && (
-                <p className="mt-2 text-xs text-stone-500">
-                  정산 예상액(80%):{' '}
-                  <span className="font-semibold text-stone-700">
-                    ₩{Math.round(Number(price) * 0.8).toLocaleString()}
-                  </span>{' '}
-                  · 판매가 ₩{Number(price).toLocaleString()}
-                </p>
-              )}
-            </Field>
-          )}
+        {/* 가격 (모든 강의 단품 판매) */}
+        <Section title="가격">
+          <Field label="판매 가격 (원)">
+            <div className="relative max-w-xs">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-400">
+                ₩
+              </span>
+              <input
+                value={price}
+                onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ''))}
+                inputMode="numeric"
+                className="w-full rounded-xl border border-stone-300 py-2.5 pl-8 pr-4 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+              />
+            </div>
+            {Number(price) > 0 ? (
+              <p className="mt-2 text-xs text-stone-500">
+                정산 예상액(80%):{' '}
+                <span className="font-semibold text-stone-700">
+                  ₩{Math.round(Number(price) * 0.8).toLocaleString()}
+                </span>{' '}
+                · 판매가 ₩{Number(price).toLocaleString()}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-stone-500">0원으로 두면 무료 강의로 공개됩니다.</p>
+            )}
+          </Field>
         </Section>
 
         {/* 커리큘럼 */}
@@ -344,39 +324,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <label className="mb-1.5 block text-sm font-semibold text-stone-700">{label}</label>
       {children}
     </div>
-  )
-}
-
-function ModeCard({
-  active,
-  onClick,
-  title,
-  desc,
-  icon,
-  accent,
-}: {
-  active: boolean
-  onClick: () => void
-  title: string
-  desc: string
-  icon: string
-  accent?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-xl border p-4 text-left transition ${
-        active
-          ? accent
-            ? 'border-indigo-400 bg-indigo-50 ring-1 ring-indigo-200'
-            : 'border-amber-400 bg-amber-50 ring-1 ring-amber-200'
-          : 'border-stone-200 bg-white hover:border-stone-300'
-      }`}
-    >
-      <div className="text-xl">{icon}</div>
-      <div className="mt-1 font-bold text-stone-900">{title}</div>
-      <div className="text-sm text-stone-500">{desc}</div>
-    </button>
   )
 }
 

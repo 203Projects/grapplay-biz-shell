@@ -12,3 +12,28 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+
+/* 가로 스크롤 캐러셀에서 스크롤바 숨김 */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* 실시간 후기 마퀴(좌→우 무한 흐름) */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}

@@ -1,22 +1,29 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  CURRENT_EXPERT_ID,
-  getExpert,
-  getExpertStats,
-  getCoursesByExpert,
-  COURSE_REVIEWS,
-  getCourse,
-  formatPrice,
-} from '../../data/mock'
+import { CURRENT_EXPERT_ID, formatPrice } from '../../data/mock'
+import { useBizData } from '../../lib/useBizData'
 
 type Tab = '내 강의' | '영상' | '리뷰 관리' | '수익 분석' | '정산'
 const TABS: Tab[] = ['내 강의', '영상', '리뷰 관리', '수익 분석', '정산']
 
 export default function AcademyExpertDashboard() {
+  const { getExpert, getExpertStats, loading } = useBizData()
   const [tab, setTab] = useState<Tab>('내 강의')
-  const expert = getExpert(CURRENT_EXPERT_ID)!
+  const expert = getExpert(CURRENT_EXPERT_ID)
   const stats = getExpertStats(CURRENT_EXPERT_ID)
+
+  if (loading || !expert) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <div className="h-20 animate-pulse rounded-2xl bg-stone-100" />
+        <div className="mt-6 grid gap-4 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-2xl bg-stone-100" />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -107,6 +114,7 @@ function StatCard({
 
 /* ── 내 강의 탭 ── */
 function MyCoursesTab() {
+  const { getCoursesByExpert } = useBizData()
   const courses = getCoursesByExpert(CURRENT_EXPERT_ID)
 
   return (
@@ -124,11 +132,6 @@ function MyCoursesTab() {
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-amber-600">{c.category}</span>
-              {c.isSubscriptionExcluded && c.price > 0 && (
-                <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
-                  단품 판매
-                </span>
-              )}
             </div>
             <h3 className="mt-0.5 font-bold text-stone-900">{c.title}</h3>
             <div className="mt-1 flex flex-wrap gap-3 text-xs text-stone-400">
@@ -213,7 +216,8 @@ function VideosTab() {
 
 /* ── 리뷰 관리 탭 (course_reviews, 숨김/PDF 발송, md §9.2) ── */
 function ReviewsTab() {
-  const reviews = COURSE_REVIEWS.filter((r) =>
+  const { courseReviews, getCoursesByExpert, getCourse } = useBizData()
+  const reviews = courseReviews.filter((r) =>
     getCoursesByExpert(CURRENT_EXPERT_ID).some((c) => c.id === r.courseId),
   )
 

@@ -1,145 +1,135 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CATEGORIES, COURSES, EXPERTS } from '../data/mock'
+import { CATEGORIES } from '../data/mock'
+import { useBizData } from '../lib/useBizData'
 import CourseCard from '../components/CourseCard'
+import CourseCarousel from '../components/CourseCarousel'
+import EbookCard from '../components/EbookCard'
+import { EBOOKS } from '../data/mockEbooks'
+import { PROMO_BANNERS, pseudoRating, maskName } from '../data/mockMarketplace'
 
 export default function AcademyLanding() {
-  const featured = COURSES.slice(0, 3)
+  const { courses, getCourse, courseReviews, loading } = useBizData()
+
+  const best = [...courses].sort((a, b) => b.studentCount - a.studentCount)
+  const free = courses.filter((c) => c.price === 0)
+  const latest = [...courses].reverse()
+
+  const tickerReviews = courseReviews.map((r) => ({
+    id: r.id,
+    name: maskName(r.userName),
+    rating: pseudoRating(r.id),
+    course: getCourse(r.courseId)?.title ?? '',
+    text: r.content,
+  }))
 
   return (
     <div>
-      {/* Hero */}
-      <section className="relative overflow-hidden border-b border-stone-200 bg-gradient-to-b from-amber-50 to-stone-50">
-        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:px-6 md:grid-cols-2 md:py-24">
-          <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-700">
-              🥋 체육관 운영자를 위한
-            </span>
-            <h1 className="mt-4 text-4xl font-black leading-tight tracking-tight text-stone-900 sm:text-5xl">
-              운동은 가르치지만,
-              <br />
-              <span className="bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">
-                경영은 누가 가르쳐주나요?
-              </span>
-            </h1>
-            <p className="mt-5 max-w-md text-lg text-stone-600">
-              마케팅·상권분석·연금·운영까지. 현장에서 검증된 전문가가 알려주는
-              체육관 비즈니스 교육, 그래플레이 비즈.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                to="/academy/library"
-                className="rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white hover:bg-stone-800"
-              >
-                강의 둘러보기
-              </Link>
-              <Link
-                to="/academy/pricing"
-                className="rounded-xl border border-stone-300 bg-white px-6 py-3 font-semibold text-stone-700 hover:bg-stone-100"
-              >
-                요금제 보기
-              </Link>
-            </div>
-            <div className="mt-8 flex items-center gap-6 text-sm text-stone-500">
-              <Stat value="2,000+" label="수강생" />
-              <Stat value="4종" label="전문 분야" />
-              <Stat value="4.8★" label="평균 만족도" />
-            </div>
-          </div>
-
-          {/* Hero 비주얼 */}
-          <div className="relative hidden md:block">
-            <div className="absolute -left-6 top-8 h-40 w-64 rotate-[-6deg] rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 p-5 text-white shadow-xl">
-              <div className="text-3xl">📣</div>
-              <div className="mt-2 font-bold">첫 100명 회원 만들기</div>
-              <div className="mt-1 text-sm text-white/80">마케팅 · 12강</div>
-            </div>
-            <div className="absolute right-0 top-0 h-40 w-60 rotate-[5deg] rounded-2xl bg-white p-5 shadow-xl">
-              <div className="text-3xl">📍</div>
-              <div className="mt-2 font-bold text-stone-900">데이터로 고르는 입지</div>
-              <div className="mt-1 text-sm text-stone-500">상권분석 · 9강</div>
-            </div>
-            <div className="absolute bottom-0 left-12 h-40 w-60 rotate-[3deg] rounded-2xl bg-stone-900 p-5 text-white shadow-xl">
-              <div className="text-3xl">🏋️</div>
-              <div className="mt-2 font-bold">회원 이탈 막는 운영</div>
-              <div className="mt-1 text-sm text-white/70">체육관 운영 · 14강</div>
-            </div>
-            <div className="h-80" />
-          </div>
+      {/* 1. 히어로 + 자동 슬라이드 배너 */}
+      <section className="mx-auto max-w-6xl px-4 pt-8 sm:px-6">
+        <h1 className="text-center text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+          체육관 경영, 오늘은 무엇을 배워볼까요?
+        </h1>
+        <p className="mt-2 text-center text-slate-500">
+          마케팅·상권분석·연금·운영까지 — 현장 전문가의 비즈니스 강의
+        </p>
+        <div className="mt-7">
+          <BannerCarousel />
         </div>
       </section>
 
-      {/* 카테고리 */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <h2 className="text-2xl font-black text-stone-900">무엇을 배우고 싶으세요?</h2>
-        <p className="mt-2 text-stone-500">체육관 경영에 꼭 필요한 4가지 분야</p>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* 2. 카테고리 */}
+      <Section>
+        <SectionHeader title="무엇을 배우고 싶으세요?" desc="체육관 경영에 꼭 필요한 4가지 분야" />
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {CATEGORIES.map((c) => (
             <Link
               key={c.key}
               to="/academy/library"
-              className="group rounded-2xl border border-stone-200 bg-white p-6 transition hover:border-amber-300 hover:shadow-md"
+              className="group rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-violet-300 hover:shadow-md"
             >
-              <div className="text-4xl">{c.emoji}</div>
-              <h3 className="mt-4 text-lg font-bold text-stone-900 group-hover:text-amber-700">
-                {c.key}
-              </h3>
-              <p className="mt-1 text-sm text-stone-500">{c.desc}</p>
+              <div className="text-3xl">{c.emoji}</div>
+              <h3 className="mt-3 font-bold text-slate-900 group-hover:text-violet-700">{c.key}</h3>
+              <p className="mt-1 text-sm text-slate-500">{c.desc}</p>
             </Link>
           ))}
         </div>
-      </section>
+      </Section>
 
-      {/* 추천 강의 */}
-      <section className="border-y border-stone-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <div className="flex items-end justify-between">
-            <div>
-              <h2 className="text-2xl font-black text-stone-900">지금 인기 있는 강의</h2>
-              <p className="mt-2 text-stone-500">관장님들이 가장 많이 찾는 코스</p>
-            </div>
-            <Link
-              to="/academy/library"
-              className="hidden text-sm font-semibold text-amber-600 hover:underline sm:block"
-            >
-              전체 보기 →
-            </Link>
-          </div>
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {featured.map((c) => (
+      {/* 3. 실시간 베스트 */}
+      <Section divider>
+        <SectionHeader title="실시간 베스트" desc="관장님들이 가장 많이 찾는 강의" moreTo="/academy/library" />
+        {loading ? <CarouselSkeleton /> : <CourseCarousel courses={best} />}
+      </Section>
+
+      {/* 4. 무료 베스트 */}
+      {free.length > 0 && (
+        <Section divider>
+          <SectionHeader title="무료 베스트" desc="부담 없이 시작하는 무료 강의" />
+          <CourseCarousel courses={free} />
+        </Section>
+      )}
+
+      {/* 5. 최신 강의 */}
+      <Section divider>
+        <SectionHeader title="최신 강의" desc="새로 올라온 강의를 만나보세요" moreTo="/academy/library" />
+        {loading ? (
+          <GridSkeleton />
+        ) : (
+          <div className="mt-2 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {latest.map((c) => (
               <CourseCard key={c.id} course={c} />
             ))}
           </div>
-        </div>
-      </section>
+        )}
+      </Section>
 
-      {/* 전문가 */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <h2 className="text-2xl font-black text-stone-900">현장 전문가가 직접 가르칩니다</h2>
-        <p className="mt-2 text-stone-500">이론이 아니라 실전에서 검증된 노하우</p>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {EXPERTS.map((e) => (
-            <div key={e.id} className="rounded-2xl border border-stone-200 bg-white p-6">
-              <div className="grid h-14 w-14 place-items-center rounded-full bg-amber-100 text-3xl">
-                {e.avatar}
-              </div>
-              <h3 className="mt-4 font-bold text-stone-900">{e.name}</h3>
-              <p className="text-sm font-medium text-amber-600">{e.title}</p>
-              <p className="mt-2 text-sm leading-relaxed text-stone-500">{e.bio}</p>
+      {/* 6. 인기 전자책 */}
+      <Section divider>
+        <SectionHeader title="인기 전자책" desc="바로 읽는 체육관 경영 가이드" moreTo="/academy/ebooks" />
+        <div className="no-scrollbar -mx-4 mt-2 flex snap-x gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6">
+          {EBOOKS.map((e) => (
+            <div key={e.id} className="w-64 shrink-0 snap-start sm:w-72">
+              <EbookCard ebook={e} />
             </div>
           ))}
         </div>
-      </section>
+      </Section>
+
+      {/* 7. 실시간 후기 (마퀴) */}
+      {tickerReviews.length > 0 && (
+        <Section divider>
+          <SectionHeader title="실시간 후기" desc="수강생들이 남긴 생생한 후기" />
+          <div className="no-scrollbar mt-2 overflow-hidden">
+            <div className="flex w-max animate-marquee gap-4">
+              {[...tickerReviews, ...tickerReviews].map((r, i) => (
+                <div
+                  key={i}
+                  className="w-80 shrink-0 rounded-2xl border border-slate-200 bg-white p-5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-800">{r.name}</span>
+                    <span className="text-amber-400">{'★'.repeat(r.rating)}</span>
+                  </div>
+                  {r.course && <div className="mt-1 text-xs text-violet-600">{r.course}</div>}
+                  <p className="mt-2 line-clamp-2 text-sm text-slate-600">{r.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Section>
+      )}
 
       {/* CTA */}
-      <section className="px-4 pb-20 sm:px-6">
-        <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl bg-stone-900 px-6 py-14 text-center text-white sm:px-12">
-          <h2 className="text-3xl font-black">체육관 경영, 이제 혼자 고민하지 마세요</h2>
-          <p className="mx-auto mt-3 max-w-xl text-stone-300">
+      <section className="px-4 pb-16 pt-12 sm:px-6">
+        <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 to-purple-600 px-6 py-12 text-center text-white sm:px-12">
+          <h2 className="text-2xl font-black sm:text-3xl">체육관 경영, 이제 혼자 고민하지 마세요</h2>
+          <p className="mx-auto mt-3 max-w-xl text-white/85">
             지금 가입하면 무료 강의부터 바로 시청할 수 있어요.
           </p>
           <Link
             to="/academy/library"
-            className="mt-8 inline-block rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-8 py-3 font-bold text-stone-900 hover:opacity-90"
+            className="mt-7 inline-block rounded-xl bg-white px-8 py-3 font-bold text-violet-700 hover:bg-white/90"
           >
             무료로 시작하기
           </Link>
@@ -149,11 +139,116 @@ export default function AcademyLanding() {
   )
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+/* ── 자동 슬라이드 배너 ── */
+function BannerCarousel() {
+  const [idx, setIdx] = useState(0)
+  const n = PROMO_BANNERS.length
+
+  useEffect(() => {
+    const t = setInterval(() => setIdx((i) => (i + 1) % n), 4500)
+    return () => clearInterval(t)
+  }, [n])
+
   return (
-    <div>
-      <div className="text-xl font-black text-stone-900">{value}</div>
-      <div className="text-xs text-stone-500">{label}</div>
+    <div className="group relative overflow-hidden rounded-2xl">
+      <div
+        className="flex transition-transform duration-700 ease-out"
+        style={{ transform: `translateX(-${idx * 100}%)` }}
+      >
+        {PROMO_BANNERS.map((b) => (
+          <div
+            key={b.title}
+            className={`relative flex min-h-[180px] min-w-full flex-col justify-center bg-gradient-to-br ${b.gradient} p-7 text-white sm:min-h-[220px] sm:p-10`}
+          >
+            <h2 className="text-xl font-black sm:text-2xl">{b.title}</h2>
+            <p className="mt-1 max-w-sm text-sm text-white/85">{b.subtitle}</p>
+            <button className="mt-5 w-fit rounded-xl bg-white/95 px-5 py-2.5 text-sm font-bold text-slate-900 hover:bg-white">
+              {b.cta} →
+            </button>
+            <span className="pointer-events-none absolute -right-6 -top-8 text-[120px] opacity-15">
+              🎓
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* 좌우 화살표 (데스크톱 hover) */}
+      <button
+        onClick={() => setIdx((i) => (i - 1 + n) % n)}
+        className="absolute left-3 top-1/2 hidden h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white/80 text-slate-700 opacity-0 transition group-hover:opacity-100 md:grid"
+        aria-label="이전"
+      >
+        ‹
+      </button>
+      <button
+        onClick={() => setIdx((i) => (i + 1) % n)}
+        className="absolute right-3 top-1/2 hidden h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white/80 text-slate-700 opacity-0 transition group-hover:opacity-100 md:grid"
+        aria-label="다음"
+      >
+        ›
+      </button>
+
+      {/* 인디케이터 점 */}
+      <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+        {PROMO_BANNERS.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setIdx(i)}
+            className={`h-2 rounded-full transition-all ${
+              i === idx ? 'w-5 bg-white' : 'w-2 bg-white/50'
+            }`}
+            aria-label={`배너 ${i + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ── 헬퍼 ── */
+function Section({ children, divider }: { children: React.ReactNode; divider?: boolean }) {
+  return (
+    <section className={divider ? 'border-t border-slate-100' : ''}>
+      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">{children}</div>
+    </section>
+  )
+}
+
+function SectionHeader({ title, desc, moreTo }: { title: string; desc: string; moreTo?: string }) {
+  return (
+    <div className="flex items-end justify-between">
+      <div>
+        <h2 className="text-xl font-black text-slate-900 sm:text-2xl">{title}</h2>
+        <p className="mt-1 text-sm text-slate-500">{desc}</p>
+      </div>
+      {moreTo && (
+        <Link
+          to={moreTo}
+          className="hidden text-sm font-semibold text-violet-600 hover:underline sm:block"
+        >
+          전체 보기 →
+        </Link>
+      )}
+    </div>
+  )
+}
+
+function CarouselSkeleton() {
+  return (
+    <div className="mt-2 flex gap-4 overflow-hidden">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="h-72 w-64 shrink-0 animate-pulse rounded-2xl bg-slate-100 sm:w-72" />
+      ))}
+    </div>
+  )
+}
+
+function GridSkeleton() {
+  return (
+    <div className="mt-2 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="h-72 animate-pulse rounded-2xl bg-slate-100" />
+      ))}
     </div>
   )
 }

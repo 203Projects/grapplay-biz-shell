@@ -1,16 +1,18 @@
 import { useState } from 'react'
-import { CATEGORIES, COURSES, Category } from '../data/mock'
+import { CATEGORIES, Category } from '../data/mock'
+import { useBizData } from '../lib/useBizData'
 import CourseCard from '../components/CourseCard'
 
 type Filter = '전체' | Category
 type Sort = '인기순' | '최신순' | '가격 낮은순'
 
 export default function AcademyLibrary() {
+  const { courses, loading } = useBizData()
   const [filter, setFilter] = useState<Filter>('전체')
   const [sort, setSort] = useState<Sort>('인기순')
   const [query, setQuery] = useState('')
 
-  let list = COURSES.filter((c) => filter === '전체' || c.category === filter).filter(
+  let list = courses.filter((c) => filter === '전체' || c.category === filter).filter(
     (c) =>
       query.trim() === '' ||
       c.title.includes(query) ||
@@ -72,9 +74,20 @@ export default function AcademyLibrary() {
       </div>
 
       {/* 결과 */}
-      <p className="mt-6 text-sm text-stone-500">총 {list.length}개 강의</p>
+      <p className="mt-6 text-sm text-stone-500">
+        {loading ? '불러오는 중…' : `총 ${list.length}개 강의`}
+      </p>
 
-      {list.length === 0 ? (
+      {loading ? (
+        <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-72 animate-pulse rounded-2xl border border-stone-200 bg-stone-100"
+            />
+          ))}
+        </div>
+      ) : list.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-dashed border-stone-300 bg-white py-20 text-center">
           <div className="text-4xl">🔍</div>
           <p className="mt-4 font-semibold text-stone-700">검색 결과가 없어요</p>

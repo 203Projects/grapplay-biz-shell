@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { EXPERTS, CATEGORIES, Category, getExpertStats } from '../data/mock'
+import { CATEGORIES, Category } from '../data/mock'
+import { useBizData } from '../lib/useBizData'
 
 type Filter = '전체' | Category
 
 export default function AcademyExperts() {
+  const { experts, getExpertStats } = useBizData()
   const [filter, setFilter] = useState<Filter>('전체')
 
-  const list = EXPERTS.filter((e) => {
+  const list = experts.filter((e) => {
     if (filter === '전체') return true
     return getExpertStats(e.id).categories.includes(filter)
   })

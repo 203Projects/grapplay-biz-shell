@@ -1,0 +1,113 @@
+import { supabase, isSupabaseConfigured } from './supabase'
+import {
+  COURSES,
+  EXPERTS,
+  EXPERT_REVIEWS,
+  COURSE_REVIEWS,
+  type Course,
+  type Expert,
+  type ExpertReview,
+  type CourseReview,
+} from '../data/mock'
+
+export interface BizData {
+  courses: Course[]
+  experts: Expert[]
+  expertReviews: ExpertReview[]
+  courseReviews: CourseReview[]
+  /** true면 실제 Supabase, false면 목업 폴백 */
+  live: boolean
+}
+
+/* ── 행 → 타입 매퍼 ── */
+function mapExpert(r: any): Expert {
+  return { id: r.id, name: r.name, title: r.title, avatar: r.avatar, bio: r.bio }
+}
+
+function mapCourse(r: any): Course {
+  return {
+    id: r.id,
+    title: r.title,
+    subtitle: r.subtitle,
+    category: r.category,
+    expertId: r.expert_id,
+    price: r.price,
+    isSubscriptionExcluded: r.is_subscription_excluded,
+    cover: r.cover,
+    thumbEmoji: r.thumb_emoji,
+    lessonCount: r.lesson_count,
+    durationMin: r.duration_min,
+    rating: Number(r.rating),
+    reviewCount: r.review_count,
+    studentCount: r.student_count,
+    summary: r.summary,
+    curriculum: r.curriculum ?? [],
+    whatYouLearn: r.what_you_learn ?? [],
+  }
+}
+
+function mapExpertReview(r: any): ExpertReview {
+  return {
+    id: r.id,
+    expertId: r.expert_id,
+    userName: r.user_name,
+    rating: r.rating,
+    content: r.content,
+    createdAt: r.created_at,
+  }
+}
+
+function mapCourseReview(r: any): CourseReview {
+  return {
+    id: r.id,
+    courseId: r.course_id,
+    userName: r.user_name,
+    userEmail: r.user_email,
+    content: r.content,
+    createdAt: r.created_at,
+    hidden: r.hidden,
+    pdfSentCount: r.pdf_sent_count,
+  }
+}
+
+/* ── 전체 로드 (목업 폴백 포함) ── */
+export async function fetchBizData(): Promise<BizData> {
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      courses: COURSES,
+      experts: EXPERTS,
+      expertReviews: EXPERT_REVIEWS,
+      courseReviews: COURSE_REVIEWS,
+      live: false,
+    }
+  }
+
+  const [coursesRes, expertsRes, erRes, crRes] = await Promise.all([
+    supabase.from('courses').select('*').order('sort_order', { ascending: true }),
+    supabase.from('experts').select('*'),
+    supabase.from('expert_reviews').select('*').order('created_at', { ascending: false }),
+    supabase.from('course_reviews').select('*').order('created_at', { ascending: false }),
+  ])
+
+  const firstError =
+    coursesRes.error || expertsRes.error || erRes.error || crRes.error
+  if (firstError) {
+    // 실데이터 실패 시 목업으로 폴백해 화면이 깨지지 않게 함
+    console.error('[api] Supabase 조회 실패, 목업으로 폴백:', firstError.message)
+    return {
+      courses: COURSES,
+      experts: EXPERTS,
+      expertReviews: EXPERT_REVIEWS,
+      courseReviews: COURSE_REVIEWS,
+      live: false,
+    }
+  }
+
+  return {
+    courses: (coursesRes.data ?? []).map(mapCourse),
+    experts: (expertsRes.data ?? []).map(mapExpert),
+    expertReviews: (erRes.data ?? []).map(mapExpertReview),
+    courseReviews: (crRes.data ?? []).map(mapCourseReview),
+    live: true,
+  }
+}
