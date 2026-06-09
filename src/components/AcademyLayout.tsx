@@ -7,7 +7,6 @@ const MENU = [
   { to: '/library', label: '강의' },
   { to: '/ebooks', label: '전자책' },
   { to: '/experts', label: '전문가' },
-  { to: '/my?tab=wishlist', label: '관심' },
 ]
 
 // 모바일 하단 메뉴 (별도) — 홈/검색/컨텐츠/내강의
