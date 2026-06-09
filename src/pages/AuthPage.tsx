@@ -55,7 +55,7 @@ export default function AuthPage() {
           {mode === 'login' ? '로그인' : '회원가입'}
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          체육관 운영자와 지도자를 위한 비즈니스 교육 플랫폼
+          체육관 경영자와 지도자를 위한 비즈니스 교육 플랫폼
         </p>
       </div>
 

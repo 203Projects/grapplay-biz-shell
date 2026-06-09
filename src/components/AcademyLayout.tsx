@@ -1,19 +1,47 @@
 import { useState } from 'react'
-import { Link, NavLink, useLocation } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 
-// pudufu식 2줄 헤더 — (1줄) 로고/주문결제/로그인/검색, (2줄) 가운데 카테고리 메뉴바
+// pudufu식 2줄 헤더 — (1줄) 로고/주문결제/로그인/검색, (2줄) 상단 메뉴바
 const MENU = [
   { to: '/library', label: '강의' },
   { to: '/ebooks', label: '전자책' },
   { to: '/experts', label: '전문가' },
-  { to: '/my?tab=wishlist', label: '관심 강의' },
+  { to: '/my?tab=wishlist', label: '관심' },
+]
+
+// 모바일 하단 메뉴 (별도) — 홈/검색/컨텐츠/내강의
+const MOBILE_TABS = [
+  { to: '/', label: '홈', icon: '🏠' },
+  { to: '/search', label: '검색', icon: '🔍' },
+  { to: '/content', label: '컨텐츠', icon: '📚' },
+  { to: '/my', label: '내강의', icon: '🎒' },
 ]
 
 export default function AcademyLayout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const { profile } = useAuth()
+  const [search, setSearch] = useState('')
+
+  // 역할별 대시보드 메뉴를 상단 메뉴에 추가
+  const menu = [
+    ...MENU,
+    ...(profile?.role === 'expert' && profile.expert_id
+      ? [{ to: '/expert/dashboard', label: '전문가 대시보드' }]
+      : []),
+    ...(profile?.role === 'admin' ? [{ to: '/admin', label: '관리자 대시보드' }] : []),
+  ]
   // 강의/전자책 상세에서는 하단 고정 구매바와 겹치지 않도록 모바일 하단탭 숨김
   const isReaderDetail = /^\/(courses|ebooks)\//.test(pathname)
+  // 결제 페이지: 모바일 하단탭 숨김 + 모바일에서도 푸터 노출
+  const isCheckout = pathname.startsWith('/checkout')
+
+  const onSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    const q = search.trim()
+    if (q) navigate(`/search?q=${encodeURIComponent(q)}`)
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900">
@@ -28,47 +56,33 @@ export default function AcademyLayout({ children }: { children: React.ReactNode 
               </span>
             </Link>
 
-            {/* 검색창 (데스크톱 중앙) */}
-            <form
-              onSubmit={(e) => e.preventDefault()}
-              className="relative hidden min-w-0 flex-1 md:block"
-            >
+            {/* 검색창 (데스크톱 중앙) — 통합검색으로 이동 */}
+            <form onSubmit={onSearch} className="relative hidden min-w-0 flex-1 md:block">
               <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                 🔍
               </span>
               <input
-                placeholder="어떤 강의를 찾으세요?"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="강의·전자책·전문가 검색"
                 className="w-full rounded-full border border-slate-300 bg-slate-50 py-2.5 pl-11 pr-4 text-sm outline-none focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
               />
             </form>
 
             <HeaderUtil />
           </div>
-
-          {/* 검색창 (모바일 전용 줄) */}
-          <div className="px-4 pb-3 md:hidden">
-            <form onSubmit={(e) => e.preventDefault()} className="relative">
-              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                🔍
-              </span>
-              <input
-                placeholder="어떤 강의를 찾으세요?"
-                className="w-full rounded-full border border-slate-300 bg-slate-50 py-2.5 pl-11 pr-4 text-sm outline-none focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
-              />
-            </form>
-          </div>
         </div>
 
-        {/* 2줄: 가운데 카테고리 메뉴바 (데스크톱) — 큰 언더라인 탭 */}
-        <div className="hidden border-b border-slate-200 md:block">
-          <nav className="mx-auto flex max-w-6xl items-center justify-start gap-6 px-4 sm:px-6">
-            {MENU.map((m, i) => (
+        {/* 2줄: 상단 카테고리 메뉴바 (모바일·데스크톱 모두) — 큰 언더라인 탭 */}
+        <div className="border-b border-slate-200">
+          <nav className="no-scrollbar mx-auto flex max-w-6xl items-center justify-start gap-5 overflow-x-auto px-4 sm:gap-6 sm:px-6">
+            {menu.map((m, i) => (
               <NavLink
                 key={i}
                 to={m.to}
                 end
                 className={({ isActive }) =>
-                  `-mb-px border-b-2 px-1 py-3.5 text-[15px] font-bold tracking-tight transition ${
+                  `-mb-px whitespace-nowrap border-b-2 px-1 py-3 text-sm font-bold tracking-tight transition sm:py-3.5 sm:text-[15px] ${
                     isActive
                       ? 'border-violet-600 text-violet-700'
                       : 'border-transparent text-slate-600 hover:text-violet-600'
@@ -84,16 +98,10 @@ export default function AcademyLayout({ children }: { children: React.ReactNode 
 
       <main className="flex-1">{children}</main>
 
-      {/* 모바일 하단 탭 (강의/전자책 상세 제외) */}
-      {!isReaderDetail && (
-        <nav className="sticky bottom-0 z-40 grid grid-cols-5 border-t border-slate-200 bg-white/90 backdrop-blur md:hidden">
-          {[
-            { to: '/', label: '홈', icon: '🏠' },
-            { to: '/library', label: '강의', icon: '📚' },
-            { to: '/ebooks', label: '전자책', icon: '📖' },
-            { to: '/experts', label: '전문가', icon: '🧑‍🏫' },
-            { to: '/my?tab=wishlist', label: '관심', icon: '❤️' },
-          ].map((t) => {
+      {/* 모바일 하단 메뉴 (홈/검색/컨텐츠/내강의) — 상세·결제 페이지 제외 */}
+      {!isReaderDetail && !isCheckout && (
+        <nav className="sticky bottom-0 z-40 grid grid-cols-4 border-t border-slate-200 bg-white/90 backdrop-blur md:hidden">
+          {MOBILE_TABS.map((t) => {
             const base = t.to.split('?')[0]
             const active = base === '/' ? pathname === '/' : pathname.startsWith(base)
             return (
@@ -112,8 +120,10 @@ export default function AcademyLayout({ children }: { children: React.ReactNode 
         </nav>
       )}
 
-      {/* 푸터 */}
-      <footer className="border-t border-slate-200 bg-slate-50">
+      {/* 푸터 — 모바일에선 기본 숨김, 결제 페이지에서만 노출 */}
+      <footer
+        className={`border-t border-slate-200 bg-slate-50 ${isCheckout ? '' : 'hidden md:block'}`}
+      >
         <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
           <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
             <div>
@@ -121,13 +131,25 @@ export default function AcademyLayout({ children }: { children: React.ReactNode 
                 grapplay<span className="text-violet-600">-biz</span>
               </span>
               <p className="mt-3 max-w-xs text-sm text-slate-500">
-                체육관 운영자와 지도자를 위한 비즈니스 교육 플랫폼.
+                체육관 경영자와 지도자를 위한 비즈니스 교육 플랫폼.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-8 text-sm sm:grid-cols-3">
-              <FooterCol title="서비스" items={['강의 둘러보기', '전문가', '전문가 되기']} />
-              <FooterCol title="회사" items={['소개', '공지사항', 'FAQ']} />
-              <FooterCol title="고객지원" items={['문의하기', '이용약관', '개인정보처리방침']} />
+            <div className="grid grid-cols-2 gap-8 text-sm">
+              <FooterCol
+                title="서비스"
+                items={[
+                  { label: '강의 둘러보기', to: '/library' },
+                  { label: '전문가', to: '/experts' },
+                ]}
+              />
+              <FooterCol
+                title="고객지원"
+                items={[
+                  { label: '문의하기', to: '/contact' },
+                  { label: '이용약관', to: '/terms' },
+                  { label: '개인정보처리방침', to: '/privacy' },
+                ]}
+              />
             </div>
           </div>
 
@@ -258,14 +280,16 @@ function MenuLink({
   )
 }
 
-function FooterCol({ title, items }: { title: string; items: string[] }) {
+function FooterCol({ title, items }: { title: string; items: { label: string; to: string }[] }) {
   return (
     <div>
       <h4 className="mb-3 font-semibold text-slate-900">{title}</h4>
       <ul className="space-y-2">
         {items.map((i) => (
-          <li key={i}>
-            <span className="cursor-pointer text-slate-500 hover:text-violet-600">{i}</span>
+          <li key={i.to}>
+            <Link to={i.to} className="text-slate-500 hover:text-violet-600">
+              {i.label}
+            </Link>
           </li>
         ))}
       </ul>

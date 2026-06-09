@@ -14,6 +14,11 @@ import AcademyEbookEditor from './pages/academy-expert/AcademyEbookEditor'
 import AcademyCourseLearn from './pages/AcademyCourseLearn'
 import AcademyEbookRead from './pages/AcademyEbookRead'
 import AdminDashboard from './pages/admin/AdminDashboard'
+import ContentHub from './pages/ContentHub'
+import SearchResults from './pages/SearchResults'
+import Contact from './pages/Contact'
+import Terms from './pages/legal/Terms'
+import Privacy from './pages/legal/Privacy'
 import AuthPage from './pages/AuthPage'
 import AuthCallback from './pages/AuthCallback'
 import Checkout from './pages/Checkout'
@@ -46,6 +51,8 @@ export default function App() {
         />
         <Route path="/ebooks" element={<AcademyEbooks />} />
         <Route path="/ebooks/:id" element={<AcademyEbookDetail />} />
+        <Route path="/content" element={<ContentHub />} />
+        <Route path="/search" element={<SearchResults />} />
         <Route
           path="/read/:id"
           element={
@@ -75,6 +82,9 @@ export default function App() {
           }
         />
         <Route path="/payments/fail" element={<PaymentFail />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route
           path="/expert/dashboard"
           element={

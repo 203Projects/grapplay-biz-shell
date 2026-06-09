@@ -117,6 +117,7 @@ export interface EbookInput {
   title: string
   subtitle: string
   author: string
+  category?: Category
   price: number
   originalPrice?: number | null
   pageCount: number
@@ -142,6 +143,7 @@ function ebookRow(input: EbookInput) {
     title: input.title,
     subtitle: input.subtitle,
     author: input.author,
+    category: input.category ?? null,
     price: input.price,
     original_price: input.originalPrice ?? null,
     page_count: input.pageCount,

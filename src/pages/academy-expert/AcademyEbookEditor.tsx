@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { uploadToCovers } from '../../lib/storage'
 import { createEbook, updateEbook, type EbookInput } from '../../lib/expertApi'
+import { CATEGORIES, type Category } from '../../data/mock'
 import type { Ebook } from '../../data/mockEbooks'
 
 type BlockType = 'heading' | 'text' | 'image'
@@ -67,6 +68,7 @@ function EditorForm({ existing, isEdit }: { existing?: Ebook; isEdit: boolean })
 
   const [title, setTitle] = useState(existing?.title ?? '')
   const [subtitle, setSubtitle] = useState(existing?.subtitle ?? '')
+  const [category, setCategory] = useState<Category>(existing?.category ?? CATEGORIES[0].key)
   const [price, setPrice] = useState(String(existing?.price ?? 0))
   const [originalPrice, setOriginalPrice] = useState(String(existing?.originalPrice ?? ''))
   const [pageCount, setPageCount] = useState(String(existing?.pageCount ?? 0))
@@ -169,6 +171,7 @@ function EditorForm({ existing, isEdit }: { existing?: Ebook; isEdit: boolean })
       expertId: targetExpertId,
       title: title.trim(),
       subtitle: subtitle.trim(),
+      category,
       author: expert.name,
       avatar: expert.avatar,
       price: Number(price) || 0,
@@ -235,6 +238,23 @@ function EditorForm({ existing, isEdit }: { existing?: Ebook; isEdit: boolean })
               placeholder="한 문장으로 설명해 주세요"
               className="w-full rounded-xl border border-stone-300 px-4 py-2.5 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
             />
+          </Field>
+          <Field label="카테고리">
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c.key}
+                  onClick={() => setCategory(c.key)}
+                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
+                    category === c.key
+                      ? 'border-stone-900 bg-stone-900 text-white'
+                      : 'border-stone-300 text-stone-600 hover:bg-stone-100'
+                  }`}
+                >
+                  {c.emoji} {c.key}
+                </button>
+              ))}
+            </div>
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="표지 색">

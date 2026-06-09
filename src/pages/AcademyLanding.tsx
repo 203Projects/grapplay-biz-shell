@@ -32,7 +32,7 @@ export default function AcademyLanding() {
           체육관 경영, 오늘은 무엇을 배워볼까요?
         </h1>
         <p className="mt-2 text-center text-slate-500">
-          마케팅·상권분석·연금·운영까지 — 현장 전문가의 비즈니스 강의
+          마케팅·상권분석·연금·경영까지 — 현장 전문가의 비즈니스 강의
         </p>
         <div className="mt-7">
           <BannerCarousel />
@@ -46,7 +46,7 @@ export default function AcademyLanding() {
           {CATEGORIES.map((c) => (
             <Link
               key={c.key}
-              to="/library"
+              to={`/library?cat=${encodeURIComponent(c.key)}`}
               className="group rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-violet-300 hover:shadow-md"
             >
               <div className="text-3xl">{c.emoji}</div>

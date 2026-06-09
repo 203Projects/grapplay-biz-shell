@@ -81,6 +81,7 @@ function mapEbook(r: any): Ebook {
     title: r.title,
     subtitle: r.subtitle,
     author: r.author,
+    category: r.category ?? undefined,
     expertId: r.expert_id ?? undefined,
     avatar: r.avatar,
     cover: r.cover,

@@ -1,13 +1,13 @@
 // 그래플레이 비즈 — 껍데기용 목업 데이터 (실제 API/DB 연동 전)
-// 카테고리 4종: 마케팅 · 상권분석 · 연금 · 체육관 운영 (md 문서 §1 기준)
+// 카테고리 4종: 마케팅 · 상권분석 · 연금 · 경영 (md 문서 §1 기준)
 
-export type Category = '마케팅' | '상권분석' | '연금' | '체육관 운영'
+export type Category = '마케팅' | '상권분석' | '연금' | '경영'
 
 export const CATEGORIES: { key: Category; emoji: string; desc: string }[] = [
   { key: '마케팅', emoji: '📣', desc: '신규 회원 모집과 브랜딩 전략' },
   { key: '상권분석', emoji: '📍', desc: '입지 선정과 상권 데이터 읽는 법' },
   { key: '연금', emoji: '💰', desc: '관장을 위한 노후·자산 설계' },
-  { key: '체육관 운영', emoji: '🏋️', desc: '운영 효율과 수익 구조 설계' },
+  { key: '경영', emoji: '🏋️', desc: '운영 효율과 수익 구조 설계' },
 ]
 
 export interface Expert {
@@ -51,7 +51,7 @@ export const EXPERTS: Expert[] = [
   {
     id: 'e1',
     name: '김도장',
-    title: '15년차 체육관 운영 컨설턴트',
+    title: '15년차 체육관 경영 컨설턴트',
     avatar: '🥋',
     bio: '전국 40개 지점 프랜차이즈를 직접 운영하며 다져온 현장 노하우를 전합니다.',
   },
@@ -171,7 +171,7 @@ export const COURSES: Course[] = [
     id: 'c4',
     title: '회원 이탈 막는 운영 시스템',
     subtitle: '등록보다 어려운 건 재등록입니다',
-    category: '체육관 운영',
+    category: '경영',
     expertId: 'e1',
     price: 89000,
     isSubscriptionExcluded: true,
@@ -229,7 +229,7 @@ export const COURSES: Course[] = [
     id: 'c6',
     title: '프랜차이즈 vs 개인관 손익 비교',
     subtitle: '창업 전에 숫자로 따져보기',
-    category: '체육관 운영',
+    category: '경영',
     expertId: 'e1',
     price: 0,
     isSubscriptionExcluded: false,

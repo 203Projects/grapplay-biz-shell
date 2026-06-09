@@ -23,6 +23,7 @@
 | 8 | `20260613000100_course_cover_image.sql` | courses에 cover_image (covers 버킷 재사용) |
 | 9 | `20260614000000_admin_access.sql` | 관리자 read/관리 정책 (profiles·orders·enrollments read, experts write, course_reviews update, expert_reviews delete) |
 | 10 | `20260614000100_admin_set_role.sql` | `admin_set_user_role()` RPC — 회원 역할 변경(승격/강등/관리자 지정) |
+| 11 | `20260615000000_category_rename_ebook_category.sql` | 카테고리 "체육관 운영"→"경영" rename + ebooks에 category 컬럼 + 시드 카테고리 |
 
 ---
 
@@ -75,6 +76,7 @@
 | id | text PK | |
 | expert_id | text FK→experts | on delete set null |
 | title, subtitle, author, summary | text | |
+| **category** | text | 마케팅/상권분석/연금/경영 (강의와 동일 4종, nullable) |
 | avatar, emoji | text | 이모지 |
 | cover | text | 그라데이션 (이미지 없을 때 폴백) |
 | **cover_image** | text | 업로드 표지 이미지 URL (covers 버킷) |

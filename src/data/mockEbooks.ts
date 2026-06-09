@@ -4,13 +4,14 @@
 // 데모용 공개 샘플 PDF (실제 서비스에선 Supabase Storage URL로 교체)
 const SAMPLE_PDF = 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf'
 
-import type { DetailBlock } from './mock'
+import type { Category, DetailBlock } from './mock'
 
 export interface Ebook {
   id: string
   title: string
   subtitle: string
   author: string
+  category?: Category
   expertId?: string
   avatar: string // 이모지
   cover: string // Tailwind 그라데이션 (이미지 없을 때 폴백)
@@ -36,6 +37,7 @@ export const EBOOKS: Ebook[] = [
     title: '체육관 운영 체크리스트 50',
     subtitle: '오픈부터 운영까지 빠짐없이 챙기는 50가지',
     author: '김도장',
+    category: '경영',
     avatar: '🥋',
     cover: 'from-violet-500 to-fuchsia-500',
     emoji: '📋',
@@ -54,6 +56,7 @@ export const EBOOKS: Ebook[] = [
     title: '관장이 꼭 아는 세무 가이드',
     subtitle: '자영업자 절세, 이것만 알아도 충분',
     author: '최재무',
+    category: '연금',
     avatar: '💼',
     cover: 'from-emerald-500 to-teal-500',
     emoji: '📗',
@@ -63,7 +66,7 @@ export const EBOOKS: Ebook[] = [
     rating: 4.8,
     buyerCount: 342,
     summary:
-      '복잡한 세무를 체육관 운영자 눈높이로 풀었습니다. 노란우산공제부터 부가세·종소세 신고까지 핵심만 담았어요.',
+      '복잡한 세무를 체육관 경영자 눈높이로 풀었습니다. 노란우산공제부터 부가세·종소세 신고까지 핵심만 담았어요.',
     highlights: ['노란우산공제 활용법', '부가세·종소세 신고 절차', '놓치기 쉬운 절세 포인트'],
     pdfUrl: SAMPLE_PDF,
   },
@@ -72,6 +75,7 @@ export const EBOOKS: Ebook[] = [
     title: '회원 상담 스크립트 모음',
     subtitle: '체험 → 등록 전환을 높이는 대화 템플릿',
     author: '이마케팅',
+    category: '마케팅',
     avatar: '📈',
     cover: 'from-rose-500 to-pink-500',
     emoji: '📕',
@@ -89,6 +93,7 @@ export const EBOOKS: Ebook[] = [
     title: '상권분석 실전 워크북',
     subtitle: '후보지를 점수로 비교하는 양식 포함',
     author: '박상권',
+    category: '상권분석',
     avatar: '🗺️',
     cover: 'from-sky-500 to-indigo-500',
     emoji: '📘',
