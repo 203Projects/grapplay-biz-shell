@@ -16,6 +16,7 @@ export interface Expert {
   title: string
   avatar: string // emoji placeholder
   bio: string
+  category?: Category // 전문 분야 (관리자가 지정)
 }
 
 export interface Course {
@@ -54,6 +55,7 @@ export const EXPERTS: Expert[] = [
     title: '15년차 체육관 경영 컨설턴트',
     avatar: '🥋',
     bio: '전국 40개 지점 프랜차이즈를 직접 운영하며 다져온 현장 노하우를 전합니다.',
+    category: '경영',
   },
   {
     id: 'e2',
@@ -61,6 +63,7 @@ export const EXPERTS: Expert[] = [
     title: '로컬 비즈니스 마케터',
     avatar: '📈',
     bio: '동네 단위 소상공인 마케팅 캠페인 200건 이상을 집행한 퍼포먼스 마케터.',
+    category: '마케팅',
   },
   {
     id: 'e3',
@@ -68,6 +71,7 @@ export const EXPERTS: Expert[] = [
     title: '상권분석 데이터 애널리스트',
     avatar: '🗺️',
     bio: '공공데이터와 유동인구 분석으로 폐업률을 낮추는 입지 컨설팅 전문가.',
+    category: '상권분석',
   },
   {
     id: 'e4',
@@ -75,6 +79,7 @@ export const EXPERTS: Expert[] = [
     title: '소상공인 전문 재무설계사',
     avatar: '💼',
     bio: '자영업자 맞춤 연금·절세·자산배분을 12년간 자문해 온 FP.',
+    category: '연금',
   },
 ]
 

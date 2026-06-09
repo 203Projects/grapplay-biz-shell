@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { getPayoutAccount, type PayoutAccount, type SettlementRow } from './expertApi'
+import type { Category } from '../data/mock'
 
 // 관리자(admin) 전용 데이터 모듈. 접근 권한은 RLS의 is_admin()이 강제한다.
 // expertApi와 동일한 컨벤션: supabase 미설정 시 안전 기본값 반환.
@@ -132,6 +133,7 @@ export interface ExpertInput {
   title: string
   avatar?: string
   bio?: string
+  category?: Category
 }
 
 function genExpertId() {
@@ -146,6 +148,7 @@ export async function createExpert(input: ExpertInput) {
     title: input.title,
     avatar: input.avatar || '🧑‍🏫',
     bio: input.bio ?? '',
+    category: input.category ?? null,
   }
   const { data, error } = await supabase.from('experts').insert(row).select().single()
   return { data, error: error?.message ?? null }
@@ -160,6 +163,7 @@ export async function updateExpert(id: string, patch: ExpertInput) {
       title: patch.title,
       avatar: patch.avatar || '🧑‍🏫',
       bio: patch.bio ?? '',
+      category: patch.category ?? null,
     })
     .eq('id', id)
     .select()

@@ -23,7 +23,7 @@ export interface BizData {
 
 /* ── 행 → 타입 매퍼 ── */
 function mapExpert(r: any): Expert {
-  return { id: r.id, name: r.name, title: r.title, avatar: r.avatar, bio: r.bio }
+  return { id: r.id, name: r.name, title: r.title, avatar: r.avatar, bio: r.bio, category: r.category ?? undefined }
 }
 
 function mapCourse(r: any): Course {

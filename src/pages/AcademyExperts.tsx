@@ -11,7 +11,8 @@ export default function AcademyExperts() {
 
   const list = experts.filter((e) => {
     if (filter === '전체') return true
-    return getExpertStats(e.id).categories.includes(filter)
+    // 관리자가 지정한 전문 분야 우선, 없으면 강의 기반 카테고리로 폴백
+    return e.category === filter || getExpertStats(e.id).categories.includes(filter)
   })
 
   return (
