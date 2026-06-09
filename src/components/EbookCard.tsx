@@ -1,21 +1,32 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatPrice } from '../data/mock'
 import { Ebook, ebookDiscountPct } from '../data/mockEbooks'
+import { useWishlist } from '../lib/wishlist'
 
 export default function EbookCard({ ebook }: { ebook: Ebook }) {
-  const [wished, setWished] = useState(false)
+  const { isWished, toggle } = useWishlist()
+  const wished = isWished('ebook', ebook.id)
   const isPaid = ebook.price > 0
   const off = ebookDiscountPct(ebook.price, ebook.originalPrice)
 
   return (
     <Link
-      to={`/academy/ebooks/${ebook.id}`}
+      to={`/ebooks/${ebook.id}`}
       className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-200/60"
     >
-      {/* 표지 — 가로 비율 */}
-      <div className={`relative aspect-[16/10] bg-gradient-to-br ${ebook.cover}`}>
-        <span className="absolute inset-0 grid place-items-center text-5xl">{ebook.emoji}</span>
+      {/* 표지 — 가로 비율 (이미지 있으면 이미지, 없으면 그라데이션+이모지) */}
+      <div
+        className={`relative aspect-[16/10] ${ebook.coverImage ? 'bg-slate-100' : `bg-gradient-to-br ${ebook.cover}`}`}
+      >
+        {ebook.coverImage ? (
+          <img
+            src={ebook.coverImage}
+            alt={ebook.title}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <span className="absolute inset-0 grid place-items-center text-5xl">{ebook.emoji}</span>
+        )}
         <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-slate-700">
           전자책
         </span>
@@ -27,7 +38,7 @@ export default function EbookCard({ ebook }: { ebook: Ebook }) {
         <button
           onClick={(e) => {
             e.preventDefault()
-            setWished((v) => !v)
+            toggle('ebook', ebook.id)
           }}
           className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-sm shadow-sm transition hover:scale-110"
           aria-label="찜하기"

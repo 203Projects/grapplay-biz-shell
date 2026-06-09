@@ -43,7 +43,7 @@ export default function AcademyExperts() {
           return (
             <Link
               key={e.id}
-              to={`/academy/experts/${e.id}/reviews`}
+              to={`/experts/${e.id}/reviews`}
               className="group flex flex-col rounded-2xl border border-stone-200 bg-white p-6 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-stone-200/60"
             >
               <div className="flex items-center gap-4">
@@ -91,7 +91,7 @@ export default function AcademyExperts() {
           </p>
         </div>
         <Link
-          to="/academy-expert/dashboard"
+          to="/expert/dashboard"
           className="shrink-0 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-6 py-3 font-bold text-stone-900 hover:opacity-90"
         >
           전문가 대시보드 →

@@ -9,12 +9,14 @@ import {
   type ExpertReview,
   type CourseReview,
 } from '../data/mock'
+import { EBOOKS, type Ebook } from '../data/mockEbooks'
 
 export interface BizData {
   courses: Course[]
   experts: Expert[]
   expertReviews: ExpertReview[]
   courseReviews: CourseReview[]
+  ebooks: Ebook[]
   /** true면 실제 Supabase, false면 목업 폴백 */
   live: boolean
 }
@@ -34,6 +36,7 @@ function mapCourse(r: any): Course {
     price: r.price,
     isSubscriptionExcluded: r.is_subscription_excluded,
     cover: r.cover,
+    coverImage: r.cover_image ?? undefined,
     thumbEmoji: r.thumb_emoji,
     lessonCount: r.lesson_count,
     durationMin: r.duration_min,
@@ -43,6 +46,8 @@ function mapCourse(r: any): Course {
     summary: r.summary,
     curriculum: r.curriculum ?? [],
     whatYouLearn: r.what_you_learn ?? [],
+    useLandingPage: r.use_landing_page ?? false,
+    detailBlocks: r.detail_blocks ?? [],
   }
 }
 
@@ -70,6 +75,32 @@ function mapCourseReview(r: any): CourseReview {
   }
 }
 
+function mapEbook(r: any): Ebook {
+  return {
+    id: r.id,
+    title: r.title,
+    subtitle: r.subtitle,
+    author: r.author,
+    expertId: r.expert_id ?? undefined,
+    avatar: r.avatar,
+    cover: r.cover,
+    coverImage: r.cover_image ?? undefined,
+    emoji: r.emoji,
+    price: r.price,
+    originalPrice: r.original_price ?? undefined,
+    pageCount: r.page_count,
+    previewPages: r.preview_pages ?? undefined,
+    rating: Number(r.rating),
+    buyerCount: r.buyer_count,
+    summary: r.summary,
+    highlights: r.highlights ?? [],
+    pdfUrl: r.pdf_url,
+    isNew: r.is_new,
+    useLandingPage: r.use_landing_page ?? false,
+    detailBlocks: r.detail_blocks ?? [],
+  }
+}
+
 /* ── 전체 로드 (목업 폴백 포함) ── */
 export async function fetchBizData(): Promise<BizData> {
   if (!isSupabaseConfigured || !supabase) {
@@ -78,19 +109,21 @@ export async function fetchBizData(): Promise<BizData> {
       experts: EXPERTS,
       expertReviews: EXPERT_REVIEWS,
       courseReviews: COURSE_REVIEWS,
+      ebooks: EBOOKS,
       live: false,
     }
   }
 
-  const [coursesRes, expertsRes, erRes, crRes] = await Promise.all([
+  const [coursesRes, expertsRes, erRes, crRes, ebooksRes] = await Promise.all([
     supabase.from('courses').select('*').order('sort_order', { ascending: true }),
     supabase.from('experts').select('*'),
     supabase.from('expert_reviews').select('*').order('created_at', { ascending: false }),
     supabase.from('course_reviews').select('*').order('created_at', { ascending: false }),
+    supabase.from('ebooks').select('*').order('sort_order', { ascending: true }),
   ])
 
   const firstError =
-    coursesRes.error || expertsRes.error || erRes.error || crRes.error
+    coursesRes.error || expertsRes.error || erRes.error || crRes.error || ebooksRes.error
   if (firstError) {
     // 실데이터 실패 시 목업으로 폴백해 화면이 깨지지 않게 함
     console.error('[api] Supabase 조회 실패, 목업으로 폴백:', firstError.message)
@@ -99,6 +132,7 @@ export async function fetchBizData(): Promise<BizData> {
       experts: EXPERTS,
       expertReviews: EXPERT_REVIEWS,
       courseReviews: COURSE_REVIEWS,
+      ebooks: EBOOKS,
       live: false,
     }
   }
@@ -108,6 +142,7 @@ export async function fetchBizData(): Promise<BizData> {
     experts: (expertsRes.data ?? []).map(mapExpert),
     expertReviews: (erRes.data ?? []).map(mapExpertReview),
     courseReviews: (crRes.data ?? []).map(mapCourseReview),
+    ebooks: (ebooksRes.data ?? []).map(mapEbook),
     live: true,
   }
 }

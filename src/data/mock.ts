@@ -26,7 +26,8 @@ export interface Course {
   expertId: string
   price: number // 0 = 무료
   isSubscriptionExcluded: boolean // true = 단품판매 전용 (구독 제외)
-  cover: string // gradient class placeholder
+  cover: string // gradient class placeholder (이미지 없을 때 폴백)
+  coverImage?: string // 업로드한 표지 이미지 URL
   thumbEmoji: string
   lessonCount: number
   durationMin: number
@@ -34,8 +35,16 @@ export interface Course {
   reviewCount: number
   studentCount: number
   summary: string
-  curriculum: { title: string; durationMin: number }[]
+  curriculum: { title: string; durationMin: number; videoUrl?: string; preview?: boolean }[]
   whatYouLearn: string[]
+  useLandingPage?: boolean
+  detailBlocks?: DetailBlock[]
+}
+
+export interface DetailBlock {
+  id: number
+  type: 'heading' | 'text' | 'image'
+  value: string
 }
 
 export const EXPERTS: Expert[] = [

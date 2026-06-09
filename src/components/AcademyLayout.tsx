@@ -1,17 +1,19 @@
+import { useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
+import { useAuth } from '../lib/auth'
 
 // pudufu식 2줄 헤더 — (1줄) 로고/주문결제/로그인/검색, (2줄) 가운데 카테고리 메뉴바
 const MENU = [
-  { to: '/academy/library', label: '강의' },
-  { to: '/academy/ebooks', label: '전자책' },
-  { to: '/academy/experts', label: '전문가' },
-  { to: '/academy/my', label: '내 강의' },
+  { to: '/library', label: '강의' },
+  { to: '/ebooks', label: '전자책' },
+  { to: '/experts', label: '전문가' },
+  { to: '/my?tab=wishlist', label: '관심 강의' },
 ]
 
 export default function AcademyLayout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
   // 강의/전자책 상세에서는 하단 고정 구매바와 겹치지 않도록 모바일 하단탭 숨김
-  const isReaderDetail = /^\/academy\/(courses|ebooks)\//.test(pathname)
+  const isReaderDetail = /^\/(courses|ebooks)\//.test(pathname)
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-slate-900">
@@ -20,7 +22,7 @@ export default function AcademyLayout({ children }: { children: React.ReactNode 
         {/* 1줄: 로고 / 검색 / 유틸 (데스크톱에선 아래 메뉴줄과 구분선 없이 이어짐) */}
         <div className="border-b border-slate-200 md:border-b-0">
           <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
-            <Link to="/academy" className="shrink-0">
+            <Link to="/" className="shrink-0">
               <span className="text-xl font-black tracking-tighter sm:text-2xl">
                 grapplay<span className="text-violet-600">-biz</span>
               </span>
@@ -40,20 +42,7 @@ export default function AcademyLayout({ children }: { children: React.ReactNode 
               />
             </form>
 
-            <div className="ml-auto flex items-center gap-1 text-sm">
-              <Link
-                to="/academy/my"
-                className="hidden rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-100 lg:block"
-              >
-                주문/결제
-              </Link>
-              <button className="hidden rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-100 sm:block">
-                로그인
-              </button>
-              <button className="rounded-lg bg-gradient-to-r from-violet-600 to-purple-500 px-4 py-2 font-semibold text-white hover:opacity-90">
-                시작하기
-              </button>
-            </div>
+            <HeaderUtil />
           </div>
 
           {/* 검색창 (모바일 전용 줄) */}
@@ -99,14 +88,14 @@ export default function AcademyLayout({ children }: { children: React.ReactNode 
       {!isReaderDetail && (
         <nav className="sticky bottom-0 z-40 grid grid-cols-5 border-t border-slate-200 bg-white/90 backdrop-blur md:hidden">
           {[
-            { to: '/academy', label: '홈', icon: '🏠' },
-            { to: '/academy/library', label: '강의', icon: '📚' },
-            { to: '/academy/ebooks', label: '전자책', icon: '📖' },
-            { to: '/academy/experts', label: '전문가', icon: '🧑‍🏫' },
-            { to: '/academy/my', label: '내 강의', icon: '👤' },
+            { to: '/', label: '홈', icon: '🏠' },
+            { to: '/library', label: '강의', icon: '📚' },
+            { to: '/ebooks', label: '전자책', icon: '📖' },
+            { to: '/experts', label: '전문가', icon: '🧑‍🏫' },
+            { to: '/my?tab=wishlist', label: '관심', icon: '❤️' },
           ].map((t) => {
-            const active =
-              t.to === '/academy' ? pathname === '/academy' : pathname.startsWith(t.to)
+            const base = t.to.split('?')[0]
+            const active = base === '/' ? pathname === '/' : pathname.startsWith(base)
             return (
               <Link
                 key={t.to}
@@ -168,6 +157,104 @@ export default function AcademyLayout({ children }: { children: React.ReactNode 
         </div>
       </footer>
     </div>
+  )
+}
+
+// 헤더 우측 유틸 — 세션 상태에 따라 로그인 버튼 / 프로필 메뉴 전환
+function HeaderUtil() {
+  const { session, profile, signOut } = useAuth()
+  const [open, setOpen] = useState(false)
+
+  if (!session) {
+    return (
+      <div className="ml-auto flex items-center gap-1 text-sm">
+        <Link
+          to="/auth"
+          className="hidden rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-100 sm:block"
+        >
+          로그인
+        </Link>
+        <Link
+          to="/auth?mode=signup"
+          className="rounded-lg bg-gradient-to-r from-violet-600 to-purple-500 px-4 py-2 font-semibold text-white hover:opacity-90"
+        >
+          시작하기
+        </Link>
+      </div>
+    )
+  }
+
+  const name = profile?.display_name || session.user.email || '회원'
+  const initial = name.trim().charAt(0).toUpperCase()
+
+  return (
+    <div className="relative ml-auto flex items-center gap-1 text-sm">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100"
+      >
+        <span className="grid h-8 w-8 place-items-center rounded-full bg-violet-100 font-bold text-violet-700">
+          {initial}
+        </span>
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-12 z-50 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+            <div className="border-b border-slate-100 px-4 py-2.5">
+              <p className="truncate text-sm font-semibold text-slate-900">{name}</p>
+              <p className="truncate text-xs text-slate-400">{session.user.email}</p>
+            </div>
+            <MenuLink to="/my" onClick={() => setOpen(false)}>
+              내 강의
+            </MenuLink>
+            <MenuLink to="/my?tab=orders" onClick={() => setOpen(false)}>
+              주문/결제
+            </MenuLink>
+            {profile?.role === 'expert' && profile.expert_id && (
+              <MenuLink to="/expert/dashboard" onClick={() => setOpen(false)}>
+                지도자 대시보드
+              </MenuLink>
+            )}
+            {profile?.role === 'admin' && (
+              <MenuLink to="/admin" onClick={() => setOpen(false)}>
+                관리자 대시보드
+              </MenuLink>
+            )}
+            <button
+              onClick={() => {
+                setOpen(false)
+                signOut()
+              }}
+              className="block w-full px-4 py-2.5 text-left text-sm text-rose-600 hover:bg-slate-50"
+            >
+              로그아웃
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function MenuLink({
+  to,
+  onClick,
+  children,
+}: {
+  to: string
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <Link
+      to={to}
+      onClick={onClick}
+      className="block px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+    >
+      {children}
+    </Link>
   )
 }
 

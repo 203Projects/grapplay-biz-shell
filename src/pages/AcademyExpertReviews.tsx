@@ -30,7 +30,7 @@ export default function AcademyExpertReviews() {
         <div className="text-5xl">🤔</div>
         <h1 className="mt-4 text-2xl font-bold text-stone-900">전문가를 찾을 수 없어요</h1>
         <Link
-          to="/academy/experts"
+          to="/experts"
           className="mt-6 inline-block rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white"
         >
           전문가 목록으로
@@ -45,7 +45,7 @@ export default function AcademyExpertReviews() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <Link to="/academy/experts" className="text-sm text-stone-500 hover:text-amber-600">
+      <Link to="/experts" className="text-sm text-stone-500 hover:text-amber-600">
         ← 전문가 목록
       </Link>
 

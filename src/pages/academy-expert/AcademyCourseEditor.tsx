@@ -1,6 +1,12 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { getCourse, CATEGORIES, Category } from '../../data/mock'
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
+import { CATEGORIES, Category, type Course } from '../../data/mock'
+import { useBizData, invalidateBizData } from '../../lib/useBizData'
+import { useAuth } from '../../lib/auth'
+import { createCourse, updateCourse, type CourseInput } from '../../lib/expertApi'
+import { uploadVideoToVimeo } from '../../lib/vimeo'
+import { supabase } from '../../lib/supabase'
+import { uploadToCovers } from '../../lib/storage'
 
 type BlockType = 'heading' | 'text' | 'image'
 interface Block {
@@ -11,34 +17,137 @@ interface Block {
 
 let blockSeq = 100
 
+// 외부: 편집 모드면 실데이터 로드 후 폼을 mount (useState 초기값이 올바르게 들어가도록)
 export default function AcademyCourseEditor() {
   const { id } = useParams()
+  const { getCourse, loading } = useBizData()
+  const isEdit = !!id
+
+  if (isEdit && loading) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+        <div className="h-10 w-40 animate-pulse rounded-lg bg-stone-100" />
+        <div className="mt-6 h-64 animate-pulse rounded-2xl bg-stone-100" />
+      </div>
+    )
+  }
+
   const existing = id ? getCourse(id) : undefined
-  const isEdit = !!existing
+  if (isEdit && !existing) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6">
+        <p className="text-stone-600">강의를 찾을 수 없습니다.</p>
+        <Link to="/expert/dashboard" className="mt-4 inline-block text-amber-600">
+          ← 대시보드
+        </Link>
+      </div>
+    )
+  }
+
+  return <EditorForm key={id ?? 'new'} existing={existing} isEdit={isEdit} />
+}
+
+function EditorForm({ existing, isEdit }: { existing?: Course; isEdit: boolean }) {
+  const navigate = useNavigate()
+  const loc = useLocation()
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
+  // 소유 전문가: 편집 시 기존 강의의 소유자, 신규 시 라우트 state(관리자) 또는 본인.
+  // 관리자가 다른 전문가 콘텐츠를 편집해도 소유권이 유지된다.
+  const targetExpertId =
+    existing?.expertId ?? (loc.state as { expertId?: string } | null)?.expertId ?? profile?.expert_id ?? null
+  const backTo = isAdmin && !profile?.expert_id ? '/admin' : '/expert/dashboard'
 
   // 기본 정보
   const [title, setTitle] = useState(existing?.title ?? '')
   const [subtitle, setSubtitle] = useState(existing?.subtitle ?? '')
   const [category, setCategory] = useState<Category>(existing?.category ?? '마케팅')
-
-  // 가격 (모든 강의 단품 판매)
   const [price, setPrice] = useState(String(existing?.price ?? 0))
+  const [coverImage, setCoverImage] = useState(existing?.coverImage ?? '')
+  const [coverUploading, setCoverUploading] = useState(false)
 
-  // 랜딩 페이지 (md §9.1 — use_landing_page + detail_blocks)
-  const [useLanding, setUseLanding] = useState(false)
-  const [blocks, setBlocks] = useState<Block[]>([
-    { id: 1, type: 'heading', value: '왜 이 강의가 필요할까요?' },
-    { id: 2, type: 'text', value: '체육관 운영의 현실적인 고민을 풀어드립니다.' },
-    { id: 3, type: 'image', value: '' },
-  ])
-
-  // 커리큘럼
-  const [lessons, setLessons] = useState<string[]>(
-    existing?.curriculum.map((c) => c.title) ?? ['1강. 강의 소개'],
+  const [useLanding, setUseLanding] = useState(existing?.useLandingPage ?? false)
+  const [blocks, setBlocks] = useState<Block[]>(
+    (existing?.detailBlocks as Block[] | undefined)?.length
+      ? (existing!.detailBlocks as Block[])
+      : [
+          { id: 1, type: 'heading', value: '왜 이 강의가 필요할까요?' },
+          { id: 2, type: 'text', value: '체육관 운영의 현실적인 고민을 풀어드립니다.' },
+          { id: 3, type: 'image', value: '' },
+        ],
   )
 
-  // 리워드 PDF (md §9.2 — review_reward_pdf_url)
+  const [lessons, setLessons] = useState<{ title: string; videoUrl: string; preview: boolean }[]>(
+    existing?.curriculum.map((c) => ({
+      title: c.title,
+      videoUrl: c.videoUrl ?? '',
+      preview: c.preview ?? false,
+    })) ?? [{ title: '1강. 강의 소개', videoUrl: '', preview: true }],
+  )
+
+  // 이런 걸 배워요 (what_you_learn)
+  const [learn, setLearn] = useState<string[]>(
+    existing?.whatYouLearn?.length ? existing.whatYouLearn : [''],
+  )
+
   const [pdfName, setPdfName] = useState<string>('')
+
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  // 레슨별 Vimeo 업로드 진행률 (0~100). 키 없으면 업로드 중 아님
+  const [uploads, setUploads] = useState<Record<number, number>>({})
+
+  async function handleCoverUpload(file: File) {
+    if (!supabase) return
+    setError(null)
+    setCoverUploading(true)
+    const ext = file.name.split('.').pop() || 'jpg'
+    const path = `courses/${crypto.randomUUID()}.${ext}`
+    const { error: upErr } = await supabase.storage
+      .from('covers')
+      .upload(path, file, { upsert: true, cacheControl: '3600' })
+    if (upErr) {
+      setCoverUploading(false)
+      setError('이미지 업로드 실패: ' + upErr.message)
+      return
+    }
+    const { data } = supabase.storage.from('covers').getPublicUrl(path)
+    setCoverImage(data.publicUrl)
+    setCoverUploading(false)
+  }
+
+  async function handleVideoUpload(i: number, file: File) {
+    setError(null)
+    setUploads((u) => ({ ...u, [i]: 0 }))
+    try {
+      const embedUrl = await uploadVideoToVimeo(file, (pct) =>
+        setUploads((u) => ({ ...u, [i]: pct })),
+      )
+      setLessons((arr) => arr.map((x, idx) => (idx === i ? { ...x, videoUrl: embedUrl } : x)))
+    } catch (e) {
+      setError('영상 업로드 실패: ' + (e as Error).message)
+    } finally {
+      setUploads((u) => {
+        const n = { ...u }
+        delete n[i]
+        return n
+      })
+    }
+  }
+
+  const [blockUploading, setBlockUploading] = useState<Record<number, boolean>>({})
+
+  async function handleBlockImage(blockId: number, file: File) {
+    setBlockUploading((u) => ({ ...u, [blockId]: true }))
+    const { url, error } = await uploadToCovers(file, 'detail-blocks')
+    setBlockUploading((u) => {
+      const n = { ...u }
+      delete n[blockId]
+      return n
+    })
+    if (error) return setError('이미지 업로드 실패: ' + error)
+    if (url) updateBlock(blockId, url)
+  }
 
   function addBlock(type: BlockType) {
     setBlocks((b) => [...b, { id: ++blockSeq, type, value: '' }])
@@ -60,22 +169,67 @@ export default function AcademyCourseEditor() {
     })
   }
 
+  async function handleSave() {
+    setError(null)
+    if (!targetExpertId) {
+      setError('전문가 권한이 없습니다.')
+      return
+    }
+    if (!title.trim()) {
+      setError('강의 제목을 입력해 주세요.')
+      return
+    }
+    const curriculum = lessons
+      .filter((l) => l.title.trim())
+      .map((l) => ({
+        title: l.title.trim(),
+        durationMin: 0,
+        videoUrl: l.videoUrl.trim() || undefined,
+        preview: l.preview,
+      }))
+
+    const input: CourseInput = {
+      expertId: targetExpertId,
+      title: title.trim(),
+      subtitle: subtitle.trim(),
+      category,
+      price: Number(price) || 0,
+      coverImage: coverImage || null,
+      curriculum,
+      whatYouLearn: learn.map((t) => t.trim()).filter(Boolean),
+      useLandingPage: useLanding,
+      detailBlocks: blocks,
+      rewardPdfUrl: pdfName || null,
+    }
+
+    setSaving(true)
+    const res = isEdit ? await updateCourse(existing!.id, input) : await createCourse(input)
+    setSaving(false)
+    if (res.error) {
+      setError(res.error)
+      return
+    }
+    invalidateBizData()
+    navigate(backTo)
+  }
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       {/* 헤더 바 */}
       <div className="flex items-center justify-between">
-        <Link
-          to="/academy-expert/dashboard"
-          className="text-sm text-stone-500 hover:text-amber-600"
-        >
+        <Link to={backTo} className="text-sm text-stone-500 hover:text-amber-600">
           ← 대시보드
         </Link>
         <div className="flex gap-2">
           <button className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50">
             미리보기
           </button>
-          <button className="rounded-lg bg-stone-900 px-5 py-2 text-sm font-semibold text-white hover:bg-stone-800">
-            저장
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="rounded-lg bg-stone-900 px-5 py-2 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-50"
+          >
+            {saving ? '저장 중…' : '저장'}
           </button>
         </div>
       </div>
@@ -83,6 +237,10 @@ export default function AcademyCourseEditor() {
       <h1 className="mt-4 text-2xl font-black text-stone-900">
         {isEdit ? '강의 편집' : '새 강의 만들기'}
       </h1>
+
+      {error && (
+        <div className="mt-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+      )}
 
       <div className="mt-8 space-y-8">
         {/* 기본 정보 */}
@@ -120,17 +278,43 @@ export default function AcademyCourseEditor() {
               ))}
             </div>
           </Field>
-          <Field label="대표 이미지">
-            <div className="grid place-items-center rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 py-10 text-center">
-              <div className="text-2xl">🖼️</div>
-              <button className="mt-2 rounded-lg border border-stone-300 bg-white px-4 py-1.5 text-sm font-semibold text-stone-600">
-                이미지 업로드
-              </button>
+          <Field label="대표 이미지 (표지)">
+            <div className="flex items-center gap-4">
+              <div className="grid h-24 w-40 shrink-0 place-items-center overflow-hidden rounded-xl border border-stone-200 bg-stone-100 text-2xl text-stone-400">
+                {coverImage ? (
+                  <img src={coverImage} alt="표지" className="h-full w-full object-cover" />
+                ) : (
+                  '🖼️'
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="cursor-pointer rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50">
+                  {coverUploading ? '업로드 중…' : '이미지 업로드'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={coverUploading}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) handleCoverUpload(f)
+                    }}
+                  />
+                </label>
+                {coverImage && (
+                  <button
+                    onClick={() => setCoverImage('')}
+                    className="text-left text-xs text-rose-500 hover:underline"
+                  >
+                    이미지 제거 (기본 표지로)
+                  </button>
+                )}
+              </div>
             </div>
           </Field>
         </Section>
 
-        {/* 가격 (모든 강의 단품 판매) */}
+        {/* 가격 */}
         <Section title="가격">
           <Field label="판매 가격 (원)">
             <div className="relative max-w-xs">
@@ -160,21 +344,128 @@ export default function AcademyCourseEditor() {
 
         {/* 커리큘럼 */}
         <Section title="커리큘럼">
-          <div className="space-y-2">
+          <p className="text-sm text-stone-500">
+            각 레슨에 영상 URL(YouTube/Vimeo)을 넣으면 강의 상세 상단 플레이어에서 재생됩니다.
+            앞 2강은 미리보기로 공개됩니다.
+          </p>
+          <div className="space-y-3">
             {lessons.map((l, i) => (
+              <div key={i} className="rounded-xl border border-stone-200 bg-white p-3">
+                <div className="flex items-center gap-2">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-stone-100 text-sm font-bold text-stone-500">
+                    {i + 1}
+                  </span>
+                  <input
+                    value={l.title}
+                    onChange={(e) =>
+                      setLessons((arr) =>
+                        arr.map((x, idx) => (idx === i ? { ...x, title: e.target.value } : x)),
+                      )
+                    }
+                    placeholder="레슨 제목"
+                    className="flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-amber-400"
+                  />
+                  <button
+                    onClick={() => setLessons((arr) => arr.filter((_, idx) => idx !== i))}
+                    className="grid h-8 w-8 place-items-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-rose-500"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="mt-2 flex items-center gap-2 pl-10">
+                  <span className="text-xs text-stone-400">🎬</span>
+                  <input
+                    value={l.videoUrl}
+                    onChange={(e) =>
+                      setLessons((arr) =>
+                        arr.map((x, idx) => (idx === i ? { ...x, videoUrl: e.target.value } : x)),
+                      )
+                    }
+                    placeholder="영상 URL 직접 입력 또는 오른쪽에서 업로드"
+                    className="flex-1 rounded-lg border border-stone-200 px-3 py-1.5 text-xs outline-none focus:border-amber-400"
+                  />
+                  <label
+                    className={`cursor-pointer whitespace-nowrap rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-50 ${
+                      uploads[i] !== undefined ? 'pointer-events-none opacity-60' : ''
+                    }`}
+                  >
+                    {uploads[i] !== undefined ? `업로드 ${uploads[i]}%` : '영상 업로드'}
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      disabled={uploads[i] !== undefined}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (f) handleVideoUpload(i, f)
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
+                </div>
+                {uploads[i] !== undefined && (
+                  <div className="mt-2 ml-10 h-1.5 overflow-hidden rounded-full bg-stone-100">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all"
+                      style={{ width: `${uploads[i]}%` }}
+                    />
+                  </div>
+                )}
+                {l.videoUrl && /vimeo\.com/.test(l.videoUrl) && uploads[i] === undefined && (
+                  <p className="mt-1 ml-10 text-[11px] text-emerald-600">
+                    ✓ Vimeo 업로드됨 (영상 처리에 몇 분 걸릴 수 있어요)
+                  </p>
+                )}
+                <label className="mt-2 flex cursor-pointer items-center gap-2 pl-10 text-xs text-stone-600">
+                  <input
+                    type="checkbox"
+                    checked={l.preview}
+                    onChange={(e) =>
+                      setLessons((arr) =>
+                        arr.map((x, idx) => (idx === i ? { ...x, preview: e.target.checked } : x)),
+                      )
+                    }
+                    className="h-4 w-4 rounded border-stone-300 accent-amber-500"
+                  />
+                  미리보기로 공개 (구매 전에도 이 강을 볼 수 있어요)
+                </label>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() =>
+              setLessons((arr) => [
+                ...arr,
+                { title: `${arr.length + 1}강. 새 레슨`, videoUrl: '', preview: false },
+              ])
+            }
+            className="mt-3 rounded-lg border border-dashed border-stone-300 px-4 py-2 text-sm font-semibold text-stone-500 hover:border-amber-300 hover:text-amber-600"
+          >
+            + 레슨 추가
+          </button>
+        </Section>
+
+        {/* 이런 걸 배워요 (what_you_learn) */}
+        <Section title="이런 걸 배워요">
+          <p className="text-sm text-stone-500">
+            강의 상세 페이지에 체크리스트로 표시됩니다. 수강생이 얻어갈 핵심을 적어주세요.
+          </p>
+          <div className="space-y-2">
+            {learn.map((l, i) => (
               <div key={i} className="flex items-center gap-2">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-stone-100 text-sm font-bold text-stone-500">
-                  {i + 1}
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-50 text-sm text-emerald-600">
+                  ✓
                 </span>
                 <input
                   value={l}
                   onChange={(e) =>
-                    setLessons((arr) => arr.map((x, idx) => (idx === i ? e.target.value : x)))
+                    setLearn((arr) => arr.map((x, idx) => (idx === i ? e.target.value : x)))
                   }
+                  placeholder="예) 월 50만원 예산으로 신규 회원 모으는 광고 세팅"
                   className="flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-amber-400"
                 />
                 <button
-                  onClick={() => setLessons((arr) => arr.filter((_, idx) => idx !== i))}
+                  onClick={() => setLearn((arr) => arr.filter((_, idx) => idx !== i))}
                   className="grid h-8 w-8 place-items-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-rose-500"
                 >
                   ✕
@@ -183,14 +474,14 @@ export default function AcademyCourseEditor() {
             ))}
           </div>
           <button
-            onClick={() => setLessons((arr) => [...arr, `${arr.length + 1}강. 새 레슨`])}
+            onClick={() => setLearn((arr) => [...arr, ''])}
             className="mt-3 rounded-lg border border-dashed border-stone-300 px-4 py-2 text-sm font-semibold text-stone-500 hover:border-amber-300 hover:text-amber-600"
           >
-            + 레슨 추가
+            + 항목 추가
           </button>
         </Section>
 
-        {/* 리치 상세페이지 (블록 에디터) */}
+        {/* 리치 상세페이지 */}
         <Section title="상세페이지 (랜딩)">
           <label className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-4">
             <div>
@@ -235,8 +526,31 @@ export default function AcademyCourseEditor() {
                   </div>
 
                   {b.type === 'image' ? (
-                    <div className="grid place-items-center rounded-lg border-2 border-dashed border-stone-300 bg-stone-50 py-8 text-sm text-stone-400">
-                      🖼️ 이미지 업로드
+                    <div>
+                      {b.value ? (
+                        <img
+                          src={b.value}
+                          alt=""
+                          className="mb-2 w-full rounded-lg border border-stone-200"
+                        />
+                      ) : (
+                        <div className="mb-2 grid place-items-center rounded-lg border-2 border-dashed border-stone-300 bg-stone-50 py-8 text-sm text-stone-400">
+                          🖼️ 이미지를 업로드하세요
+                        </div>
+                      )}
+                      <label className="inline-block cursor-pointer rounded-lg border border-stone-300 bg-white px-4 py-1.5 text-sm font-semibold text-stone-600 hover:bg-stone-50">
+                        {blockUploading[b.id] ? '업로드 중…' : b.value ? '이미지 변경' : '이미지 업로드'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={blockUploading[b.id]}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0]
+                            if (f) handleBlockImage(b.id, f)
+                          }}
+                        />
+                      </label>
                     </div>
                   ) : b.type === 'heading' ? (
                     <input
@@ -295,13 +609,17 @@ export default function AcademyCourseEditor() {
       {/* 하단 저장 바 */}
       <div className="mt-10 flex justify-end gap-2 border-t border-stone-200 pt-6">
         <Link
-          to="/academy-expert/dashboard"
+          to={backTo}
           className="rounded-lg border border-stone-300 px-5 py-2.5 text-sm font-semibold text-stone-600 hover:bg-stone-50"
         >
           취소
         </Link>
-        <button className="rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 px-6 py-2.5 text-sm font-bold text-stone-900 hover:opacity-90">
-          {isEdit ? '변경사항 저장' : '강의 등록'}
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 px-6 py-2.5 text-sm font-bold text-stone-900 hover:opacity-90 disabled:opacity-50"
+        >
+          {saving ? '저장 중…' : isEdit ? '변경사항 저장' : '강의 등록'}
         </button>
       </div>
     </div>

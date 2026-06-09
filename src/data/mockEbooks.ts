@@ -4,23 +4,30 @@
 // 데모용 공개 샘플 PDF (실제 서비스에선 Supabase Storage URL로 교체)
 const SAMPLE_PDF = 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf'
 
+import type { DetailBlock } from './mock'
+
 export interface Ebook {
   id: string
   title: string
   subtitle: string
   author: string
+  expertId?: string
   avatar: string // 이모지
-  cover: string // Tailwind 그라데이션
+  cover: string // Tailwind 그라데이션 (이미지 없을 때 폴백)
+  coverImage?: string // 업로드한 표지 이미지 URL
   emoji: string
   price: number // 0 = 무료
   originalPrice?: number
   pageCount: number
+  previewPages?: number // 상세에서 공개할 앞 페이지 수
   rating: number
   buyerCount: number
   summary: string
   highlights: string[]
   pdfUrl: string
   isNew?: boolean
+  useLandingPage?: boolean
+  detailBlocks?: DetailBlock[]
 }
 
 export const EBOOKS: Ebook[] = [

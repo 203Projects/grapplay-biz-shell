@@ -1,16 +1,40 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CURRENT_EXPERT_ID, formatPrice } from '../../data/mock'
-import { useBizData } from '../../lib/useBizData'
+import { formatPrice, type CourseReview } from '../../data/mock'
+import { useBizData, invalidateBizData } from '../../lib/useBizData'
+import { useAuth } from '../../lib/auth'
+import {
+  setReviewHidden,
+  incrementPdfSent,
+  getExpertRevenue,
+  getSettlementSummary,
+  getSettlements,
+  getPayoutAccount,
+  upsertPayoutAccount,
+  requestSettlement,
+  type ExpertRevenue,
+  type SettlementSummary,
+  type SettlementRow,
+  type PayoutAccount,
+} from '../../lib/expertApi'
 
-type Tab = '내 강의' | '영상' | '리뷰 관리' | '수익 분석' | '정산'
-const TABS: Tab[] = ['내 강의', '영상', '리뷰 관리', '수익 분석', '정산']
+type Tab = '내 강의' | '내 전자책' | '리뷰 관리' | '수익 분석' | '정산'
+const TABS: Tab[] = ['내 강의', '내 전자책', '리뷰 관리', '수익 분석', '정산']
 
 export default function AcademyExpertDashboard() {
   const { getExpert, getExpertStats, loading } = useBizData()
+  const { profile } = useAuth()
+  const expertId = profile?.expert_id ?? ''
   const [tab, setTab] = useState<Tab>('내 강의')
-  const expert = getExpert(CURRENT_EXPERT_ID)
-  const stats = getExpertStats(CURRENT_EXPERT_ID)
+  const [revenue, setRevenue] = useState<ExpertRevenue | null>(null)
+
+  const expert = getExpert(expertId)
+  const stats = getExpertStats(expertId)
+
+  useEffect(() => {
+    if (!expertId) return
+    getExpertRevenue(expertId).then(setRevenue)
+  }, [expertId])
 
   if (loading || !expert) {
     return (
@@ -44,7 +68,7 @@ export default function AcademyExpertDashboard() {
           </div>
         </div>
         <Link
-          to="/academy-expert/courses/new"
+          to="/expert/courses/new"
           className="rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3 text-center font-bold text-stone-900 hover:opacity-90"
         >
           + 새 강의 만들기
@@ -55,7 +79,12 @@ export default function AcademyExpertDashboard() {
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="총 강의" value={`${stats.courseCount}개`} icon="📚" />
         <StatCard label="총 수강생" value={`${stats.studentCount.toLocaleString()}명`} icon="👥" />
-        <StatCard label="누적 매출" value="₩12,480,000" icon="💰" accent />
+        <StatCard
+          label="누적 매출"
+          value={revenue ? formatPrice(revenue.total) : '—'}
+          icon="💰"
+          accent
+        />
         <StatCard label="평균 평점" value={`⭐ ${stats.rating.toFixed(1)}`} icon="" />
       </div>
 
@@ -77,11 +106,11 @@ export default function AcademyExpertDashboard() {
       </div>
 
       <div className="mt-8">
-        {tab === '내 강의' && <MyCoursesTab />}
-        {tab === '영상' && <VideosTab />}
-        {tab === '리뷰 관리' && <ReviewsTab />}
-        {tab === '수익 분석' && <RevenueTab />}
-        {tab === '정산' && <PayoutTab />}
+        {tab === '내 강의' && <MyCoursesTab expertId={expertId} />}
+        {tab === '내 전자책' && <MyEbooksTab expertId={expertId} />}
+        {tab === '리뷰 관리' && <ReviewsTab expertId={expertId} />}
+        {tab === '수익 분석' && <RevenueTab revenue={revenue} />}
+        {tab === '정산' && <PayoutTab expertId={expertId} expertName={expert.name} />}
       </div>
     </div>
   )
@@ -113,9 +142,9 @@ function StatCard({
 }
 
 /* ── 내 강의 탭 ── */
-function MyCoursesTab() {
+function MyCoursesTab({ expertId }: { expertId: string }) {
   const { getCoursesByExpert } = useBizData()
-  const courses = getCoursesByExpert(CURRENT_EXPERT_ID)
+  const courses = getCoursesByExpert(expertId)
 
   return (
     <div className="space-y-3">
@@ -143,13 +172,13 @@ function MyCoursesTab() {
           </div>
           <div className="flex gap-2">
             <Link
-              to={`/academy/courses/${c.id}`}
+              to={`/courses/${c.id}`}
               className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50"
             >
               미리보기
             </Link>
             <Link
-              to={`/academy-expert/courses/${c.id}/edit`}
+              to={`/expert/courses/${c.id}/edit`}
               className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800"
             >
               편집
@@ -158,8 +187,14 @@ function MyCoursesTab() {
         </div>
       ))}
 
+      {courses.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-stone-300 bg-white py-12 text-center text-sm text-stone-500">
+          아직 등록한 강의가 없어요. 첫 강의를 만들어 보세요.
+        </div>
+      )}
+
       <Link
-        to="/academy-expert/courses/new"
+        to="/expert/courses/new"
         className="flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-stone-300 bg-white py-8 font-semibold text-stone-500 hover:border-amber-300 hover:text-amber-600"
       >
         + 새 강의 만들기
@@ -168,58 +203,96 @@ function MyCoursesTab() {
   )
 }
 
-/* ── 영상 탭 (Vimeo 업로드, md §9.3) ── */
-function VideosTab() {
-  const videos = [
-    { title: '첫 100명 회원 만들기 — 1강', url: 'https://vimeo.com/000000001' },
-    { title: '체험 수업 전환 스크립트 — 3강', url: 'https://vimeo.com/000000003' },
-    { title: '광고비 회수 계산법 — 5강', url: 'https://vimeo.com/000000005' },
-  ]
-  return (
-    <div className="space-y-6">
-      {/* 업로드 박스 */}
-      <div className="rounded-2xl border border-stone-200 bg-white p-6">
-        <h3 className="font-bold text-stone-900">새 영상 업로드</h3>
-        <p className="mt-1 text-sm text-stone-500">Vimeo에 영상을 올리고 강의에 연결하세요.</p>
-        <div className="mt-4 grid place-items-center rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 py-12 text-center">
-          <div className="text-3xl">🎬</div>
-          <p className="mt-2 text-sm text-stone-500">파일을 끌어다 놓거나 클릭해서 선택</p>
-          <button className="mt-4 rounded-lg bg-stone-900 px-5 py-2 text-sm font-semibold text-white">
-            영상 선택
-          </button>
-        </div>
-      </div>
+/* ── 내 전자책 탭 ── */
+function MyEbooksTab({ expertId }: { expertId: string }) {
+  const { getEbooksByExpert } = useBizData()
+  const ebooks = getEbooksByExpert(expertId)
 
-      {/* 보유 영상 목록 */}
-      <div>
-        <h3 className="font-bold text-stone-900">보유 영상</h3>
-        <div className="mt-3 divide-y divide-stone-100 overflow-hidden rounded-2xl border border-stone-200 bg-white">
-          {videos.map((v) => (
-            <div key={v.url} className="flex items-center gap-4 p-4">
-              <div className="grid h-12 w-16 shrink-0 place-items-center rounded-lg bg-stone-900 text-lg">
-                ▶️
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-stone-800">{v.title}</p>
-                <p className="truncate text-xs text-stone-400">{v.url}</p>
-              </div>
-              <button className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-50">
-                URL 복사
-              </button>
+  return (
+    <div className="space-y-3">
+      {ebooks.map((e) => (
+        <div
+          key={e.id}
+          className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-4 sm:flex-row sm:items-center"
+        >
+          <div
+            className={`grid h-16 w-24 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${e.cover} text-2xl`}
+          >
+            {e.emoji}
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-stone-900">{e.title}</h3>
+            <div className="mt-1 flex flex-wrap gap-3 text-xs text-stone-400">
+              <span>{formatPrice(e.price)}</span>
+              <span>· {e.pageCount}쪽</span>
+              <span>· 구매 {e.buyerCount.toLocaleString()}명</span>
             </div>
-          ))}
+          </div>
+          <div className="flex gap-2">
+            <Link
+              to={`/ebooks/${e.id}`}
+              className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50"
+            >
+              미리보기
+            </Link>
+            <Link
+              to={`/expert/ebooks/${e.id}/edit`}
+              className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800"
+            >
+              편집
+            </Link>
+          </div>
         </div>
-      </div>
+      ))}
+
+      {ebooks.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-stone-300 bg-white py-12 text-center text-sm text-stone-500">
+          아직 등록한 전자책이 없어요. 첫 전자책을 만들어 보세요.
+        </div>
+      )}
+
+      <Link
+        to="/expert/ebooks/new"
+        className="flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-stone-300 bg-white py-8 font-semibold text-stone-500 hover:border-amber-300 hover:text-amber-600"
+      >
+        + 새 전자책 만들기
+      </Link>
     </div>
   )
 }
 
-/* ── 리뷰 관리 탭 (course_reviews, 숨김/PDF 발송, md §9.2) ── */
-function ReviewsTab() {
+/* ── 리뷰 관리 탭 (course_reviews, 숨김/PDF 발송) ── */
+function ReviewsTab({ expertId }: { expertId: string }) {
   const { courseReviews, getCoursesByExpert, getCourse } = useBizData()
-  const reviews = courseReviews.filter((r) =>
-    getCoursesByExpert(CURRENT_EXPERT_ID).some((c) => c.id === r.courseId),
-  )
+  const [reviews, setReviews] = useState<CourseReview[]>([])
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const ids = new Set(getCoursesByExpert(expertId).map((c) => c.id))
+    setReviews(courseReviews.filter((r) => ids.has(r.courseId)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseReviews, expertId])
+
+  const onToggleHidden = async (r: CourseReview) => {
+    setBusyId(r.id)
+    const next = !r.hidden
+    const { error } = await setReviewHidden(r.id, next)
+    setBusyId(null)
+    if (error) return alert('변경 실패: ' + error)
+    setReviews((rs) => rs.map((x) => (x.id === r.id ? { ...x, hidden: next } : x)))
+    invalidateBizData() // 다른 페이지 다녀와도 변경이 유지되도록 캐시 갱신
+  }
+
+  const onSendPdf = async (r: CourseReview) => {
+    setBusyId(r.id)
+    const { error } = await incrementPdfSent(r.id, r.pdfSentCount)
+    setBusyId(null)
+    if (error) return alert('발송 실패: ' + error)
+    setReviews((rs) =>
+      rs.map((x) => (x.id === r.id ? { ...x, pdfSentCount: x.pdfSentCount + 1 } : x)),
+    )
+    invalidateBizData()
+  }
 
   if (reviews.length === 0) {
     return (
@@ -237,6 +310,7 @@ function ReviewsTab() {
       </p>
       {reviews.map((r) => {
         const course = getCourse(r.courseId)
+        const busy = busyId === r.id
         return (
           <div
             key={r.id}
@@ -259,13 +333,21 @@ function ReviewsTab() {
             <div className="mt-1 text-xs font-medium text-amber-600">{course?.title}</div>
             <p className="mt-2 leading-relaxed text-stone-600">{r.content}</p>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+              <button
+                onClick={() => onSendPdf(r)}
+                disabled={busy}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
                 📄 PDF 보내기
                 {r.pdfSentCount > 0 && (
                   <span className="ml-1 text-indigo-200">({r.pdfSentCount}회 발송됨)</span>
                 )}
               </button>
-              <button className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50">
+              <button
+                onClick={() => onToggleHidden(r)}
+                disabled={busy}
+                className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+              >
                 {r.hidden ? '숨김 해제' : '숨기기'}
               </button>
             </div>
@@ -276,69 +358,251 @@ function ReviewsTab() {
   )
 }
 
-/* ── 수익 분석 탭 (RevenueAnalyticsTab 재사용, md §9.3) ── */
-function RevenueTab() {
-  const bars = [40, 65, 55, 80, 72, 95]
-  const months = ['1월', '2월', '3월', '4월', '5월', '6월']
+/* ── 수익 분석 탭 ── */
+function RevenueTab({ revenue }: { revenue: ExpertRevenue | null }) {
+  if (!revenue) {
+    return <div className="h-48 animate-pulse rounded-2xl bg-stone-100" />
+  }
+  const max = Math.max(1, ...revenue.byMonth.map((m) => m.amount))
+  const thisMonth = revenue.byMonth[revenue.byMonth.length - 1]?.amount ?? 0
+  const hasData = revenue.total > 0
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="이번 달 매출" value="₩2,310,000" icon="📈" accent />
-        <StatCard label="이번 달 판매" value="38건" icon="🛒" />
-        <StatCard label="정산 예정액" value="₩1,848,000" icon="💸" />
+        <StatCard label="이번 달 매출" value={formatPrice(thisMonth)} icon="📈" accent />
+        <StatCard label="누적 판매" value={`${revenue.count}건`} icon="🛒" />
+        <StatCard label="정산 예정액(80%)" value={formatPrice(Math.round(revenue.total * 0.8))} icon="💸" />
       </div>
       <div className="rounded-2xl border border-stone-200 bg-white p-6">
         <h3 className="font-bold text-stone-900">월별 매출 추이</h3>
-        <div className="mt-6 flex h-48 items-end justify-between gap-3">
-          {bars.map((h, i) => (
-            <div key={i} className="flex flex-1 flex-col items-center gap-2">
-              <div
-                className="w-full rounded-t-lg bg-gradient-to-t from-amber-400 to-orange-400"
-                style={{ height: `${h}%` }}
-              />
-              <span className="text-xs text-stone-400">{months[i]}</span>
-            </div>
-          ))}
-        </div>
-        <p className="mt-4 text-xs text-stone-400">
-          * 정산 비율 80:20 적용 (settlement-system.md 기준) — 데모 데이터
-        </p>
+        {hasData ? (
+          <div className="mt-6 flex h-48 items-end justify-between gap-3">
+            {revenue.byMonth.map((m, i) => (
+              <div key={i} className="flex flex-1 flex-col items-center gap-2">
+                <div
+                  className="w-full rounded-t-lg bg-gradient-to-t from-amber-400 to-orange-400"
+                  style={{ height: `${Math.max(2, (m.amount / max) * 100)}%` }}
+                />
+                <span className="text-xs text-stone-400">{m.month}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-6 py-10 text-center text-sm text-stone-400">
+            아직 결제된 매출이 없어요. 강의가 판매되면 여기에 표시됩니다.
+          </p>
+        )}
+        <p className="mt-4 text-xs text-stone-400">* 정산 비율 80:20 적용</p>
       </div>
     </div>
   )
 }
 
-/* ── 정산 탭 (PayoutSettingsTab 재사용, md §9.3) ── */
-function PayoutTab() {
+/* ── 정산 탭 (전문가 80% / 플랫폼 20%) ── */
+function PayoutTab({ expertId, expertName }: { expertId: string; expertName: string }) {
+  const [summary, setSummary] = useState<SettlementSummary | null>(null)
+  const [list, setList] = useState<SettlementRow[]>([])
+  const [account, setAccount] = useState<PayoutAccount | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  // 계좌 폼
+  const [editing, setEditing] = useState(false)
+  const [bank, setBank] = useState('')
+  const [accountNo, setAccountNo] = useState('')
+  const [holder, setHolder] = useState(expertName)
+
+  const reload = () => {
+    Promise.all([
+      getSettlementSummary(expertId),
+      getSettlements(expertId),
+      getPayoutAccount(expertId),
+    ]).then(([s, l, a]) => {
+      setSummary(s)
+      setList(l)
+      setAccount(a)
+      if (a) {
+        setBank(a.bank)
+        setAccountNo(a.account_no)
+        setHolder(a.holder)
+      }
+    })
+  }
+
+  useEffect(() => {
+    if (expertId) reload()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expertId])
+
+  const onSaveAccount = async () => {
+    if (!bank.trim() || !accountNo.trim() || !holder.trim()) return
+    setBusy(true)
+    const { error } = await upsertPayoutAccount(expertId, {
+      bank: bank.trim(),
+      account_no: accountNo.trim(),
+      holder: holder.trim(),
+    })
+    setBusy(false)
+    if (error) return alert('저장 실패: ' + error)
+    setEditing(false)
+    reload()
+  }
+
+  const onRequest = async () => {
+    if (!account) return alert('먼저 정산 계좌를 등록해 주세요.')
+    setBusy(true)
+    const { error } = await requestSettlement()
+    setBusy(false)
+    if (error) return alert(error)
+    reload()
+  }
+
+  if (!summary) {
+    return <div className="h-40 animate-pulse rounded-2xl bg-stone-100" />
+  }
+
   return (
     <div className="space-y-6">
+      {/* 출금 가능 금액 */}
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
-        <div className="text-sm text-stone-600">출금 가능 금액</div>
-        <div className="mt-1 text-3xl font-black text-stone-900">₩1,848,000</div>
-        <button className="mt-4 rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white hover:bg-stone-800">
+        <div className="text-sm text-stone-600">출금 가능 금액 (전문가 정산 80%)</div>
+        <div className="mt-1 text-3xl font-black text-stone-900">
+          {formatPrice(summary.available)}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
+          <span>총매출 {formatPrice(summary.gross)}</span>
+          <span>· 신청 대기 {formatPrice(summary.requested)}</span>
+          <span>· 지급완료 {formatPrice(summary.paidOut)}</span>
+        </div>
+        <button
+          onClick={onRequest}
+          disabled={busy || summary.available <= 0 || !account}
+          className="mt-4 rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white hover:bg-stone-800 disabled:opacity-40"
+        >
           출금 신청
         </button>
+        {!account && (
+          <p className="mt-2 text-xs text-rose-500">출금하려면 먼저 정산 계좌를 등록하세요.</p>
+        )}
       </div>
+
+      {/* 정산 계좌 */}
       <div className="rounded-2xl border border-stone-200 bg-white p-6">
-        <h3 className="font-bold text-stone-900">정산 계좌</h3>
-        <dl className="mt-4 space-y-3 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-stone-500">예금주</dt>
-            <dd className="font-medium text-stone-800">김도장</dd>
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-stone-900">정산 계좌</h3>
+          {!editing && (
+            <button
+              onClick={() => setEditing(true)}
+              className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm font-semibold text-stone-600 hover:bg-stone-50"
+            >
+              {account ? '변경' : '등록'}
+            </button>
+          )}
+        </div>
+
+        {editing ? (
+          <div className="mt-4 space-y-3">
+            <input
+              value={bank}
+              onChange={(e) => setBank(e.target.value)}
+              placeholder="은행명 (예: 토스뱅크)"
+              className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-amber-400"
+            />
+            <input
+              value={accountNo}
+              onChange={(e) => setAccountNo(e.target.value)}
+              placeholder="계좌번호"
+              className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-amber-400"
+            />
+            <input
+              value={holder}
+              onChange={(e) => setHolder(e.target.value)}
+              placeholder="예금주"
+              className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-amber-400"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={onSaveAccount}
+                disabled={busy}
+                className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-50"
+              >
+                저장
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50"
+              >
+                취소
+              </button>
+            </div>
           </div>
-          <div className="flex justify-between">
-            <dt className="text-stone-500">은행</dt>
-            <dd className="font-medium text-stone-800">○○은행</dd>
+        ) : (
+          <dl className="mt-4 space-y-3 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-stone-500">예금주</dt>
+              <dd className="font-medium text-stone-800">{account?.holder ?? '미등록'}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-stone-500">은행</dt>
+              <dd className={account ? 'font-medium text-stone-800' : 'text-stone-400'}>
+                {account?.bank ?? '미등록'}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-stone-500">계좌번호</dt>
+              <dd className={account ? 'font-medium text-stone-800' : 'text-stone-400'}>
+                {account?.account_no ?? '미등록'}
+              </dd>
+            </div>
+          </dl>
+        )}
+      </div>
+
+      {/* 정산 신청 내역 */}
+      <div>
+        <h3 className="font-bold text-stone-900">정산 내역</h3>
+        {list.length === 0 ? (
+          <p className="mt-3 rounded-2xl border border-dashed border-stone-300 bg-white py-10 text-center text-sm text-stone-500">
+            아직 정산 신청 내역이 없어요.
+          </p>
+        ) : (
+          <div className="mt-3 overflow-hidden rounded-2xl border border-stone-200">
+            <table className="w-full text-sm">
+              <thead className="bg-stone-50 text-left text-xs text-stone-500">
+                <tr>
+                  <th className="px-4 py-3">신청일</th>
+                  <th className="px-4 py-3">정산액(80%)</th>
+                  <th className="px-4 py-3">상태</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {list.map((s) => (
+                  <tr key={s.id}>
+                    <td className="px-4 py-3 text-stone-500">{s.requested_at?.slice(0, 10)}</td>
+                    <td className="px-4 py-3 font-semibold text-stone-800">
+                      {formatPrice(s.amount)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <SettlementStatus status={s.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="flex justify-between">
-            <dt className="text-stone-500">계좌번호</dt>
-            <dd className="font-medium text-stone-800">123-456-****</dd>
-          </div>
-        </dl>
-        <button className="mt-4 rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50">
-          계좌 변경
-        </button>
+        )}
       </div>
     </div>
   )
+}
+
+function SettlementStatus({ status }: { status: SettlementRow['status'] }) {
+  const map: Record<SettlementRow['status'], { label: string; cls: string }> = {
+    requested: { label: '신청', cls: 'bg-stone-100 text-stone-600' },
+    approved: { label: '승인', cls: 'bg-indigo-100 text-indigo-700' },
+    paid: { label: '지급완료', cls: 'bg-emerald-100 text-emerald-700' },
+    rejected: { label: '반려', cls: 'bg-rose-100 text-rose-700' },
+  }
+  const s = map[status]
+  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${s.cls}`}>{s.label}</span>
 }

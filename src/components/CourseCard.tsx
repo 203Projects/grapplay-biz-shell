@@ -1,24 +1,35 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Course, formatPrice } from '../data/mock'
 import { getCourseMeta, discountPct } from '../data/mockMarketplace'
+import { useWishlist } from '../lib/wishlist'
 
 export default function CourseCard({ course }: { course: Course }) {
-  const [wished, setWished] = useState(false)
+  const { isWished, toggle } = useWishlist()
+  const wished = isWished('course', course.id)
   const isPaid = course.price > 0
   const meta = getCourseMeta(course.id)
   const off = discountPct(course.price, meta.originalPrice)
 
   return (
     <Link
-      to={`/academy/courses/${course.id}`}
+      to={`/courses/${course.id}`}
       className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-200/60"
     >
-      {/* 썸네일 */}
-      <div className={`relative aspect-[16/10] bg-gradient-to-br ${course.cover}`}>
-        <span className="absolute inset-0 grid place-items-center text-5xl">
-          {course.thumbEmoji}
-        </span>
+      {/* 썸네일 (이미지 있으면 이미지, 없으면 그라데이션+이모지) */}
+      <div
+        className={`relative aspect-[16/10] ${course.coverImage ? 'bg-slate-100' : `bg-gradient-to-br ${course.cover}`}`}
+      >
+        {course.coverImage ? (
+          <img
+            src={course.coverImage}
+            alt={course.title}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <span className="absolute inset-0 grid place-items-center text-5xl">
+            {course.thumbEmoji}
+          </span>
+        )}
         <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-slate-700">
           {course.category}
         </span>
@@ -31,7 +42,7 @@ export default function CourseCard({ course }: { course: Course }) {
         <button
           onClick={(e) => {
             e.preventDefault()
-            setWished((v) => !v)
+            toggle('course', course.id)
           }}
           className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-sm shadow-sm transition hover:scale-110"
           aria-label="찜하기"

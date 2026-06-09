@@ -5,17 +5,18 @@ import { useBizData } from '../lib/useBizData'
 import CourseCard from '../components/CourseCard'
 import CourseCarousel from '../components/CourseCarousel'
 import EbookCard from '../components/EbookCard'
-import { EBOOKS } from '../data/mockEbooks'
 import { PROMO_BANNERS, pseudoRating, maskName } from '../data/mockMarketplace'
 
 export default function AcademyLanding() {
-  const { courses, getCourse, courseReviews, loading } = useBizData()
+  const { courses, getCourse, courseReviews, ebooks, loading } = useBizData()
 
   const best = [...courses].sort((a, b) => b.studentCount - a.studentCount)
   const free = courses.filter((c) => c.price === 0)
   const latest = [...courses].reverse()
 
-  const tickerReviews = courseReviews.map((r) => ({
+  const tickerReviews = courseReviews
+    .filter((r) => !r.hidden)
+    .map((r) => ({
     id: r.id,
     name: maskName(r.userName),
     rating: pseudoRating(r.id),
@@ -45,7 +46,7 @@ export default function AcademyLanding() {
           {CATEGORIES.map((c) => (
             <Link
               key={c.key}
-              to="/academy/library"
+              to="/library"
               className="group rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-violet-300 hover:shadow-md"
             >
               <div className="text-3xl">{c.emoji}</div>
@@ -58,7 +59,7 @@ export default function AcademyLanding() {
 
       {/* 3. 실시간 베스트 */}
       <Section divider>
-        <SectionHeader title="실시간 베스트" desc="관장님들이 가장 많이 찾는 강의" moreTo="/academy/library" />
+        <SectionHeader title="실시간 베스트" desc="관장님들이 가장 많이 찾는 강의" moreTo="/library" />
         {loading ? <CarouselSkeleton /> : <CourseCarousel courses={best} />}
       </Section>
 
@@ -72,7 +73,7 @@ export default function AcademyLanding() {
 
       {/* 5. 최신 강의 */}
       <Section divider>
-        <SectionHeader title="최신 강의" desc="새로 올라온 강의를 만나보세요" moreTo="/academy/library" />
+        <SectionHeader title="최신 강의" desc="새로 올라온 강의를 만나보세요" moreTo="/library" />
         {loading ? (
           <GridSkeleton />
         ) : (
@@ -86,9 +87,9 @@ export default function AcademyLanding() {
 
       {/* 6. 인기 전자책 */}
       <Section divider>
-        <SectionHeader title="인기 전자책" desc="바로 읽는 체육관 경영 가이드" moreTo="/academy/ebooks" />
+        <SectionHeader title="인기 전자책" desc="바로 읽는 체육관 경영 가이드" moreTo="/ebooks" />
         <div className="no-scrollbar -mx-4 mt-2 flex snap-x gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6">
-          {EBOOKS.map((e) => (
+          {ebooks.map((e) => (
             <div key={e.id} className="w-64 shrink-0 snap-start sm:w-72">
               <EbookCard ebook={e} />
             </div>
@@ -128,7 +129,7 @@ export default function AcademyLanding() {
             지금 가입하면 무료 강의부터 바로 시청할 수 있어요.
           </p>
           <Link
-            to="/academy/library"
+            to="/library"
             className="mt-7 inline-block rounded-xl bg-white px-8 py-3 font-bold text-violet-700 hover:bg-white/90"
           >
             무료로 시작하기

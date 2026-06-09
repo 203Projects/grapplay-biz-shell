@@ -1,10 +1,14 @@
-import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { formatPrice } from '../data/mock'
 import { useBizData } from '../lib/useBizData'
+import { useAuth } from '../lib/auth'
+import { supabase } from '../lib/supabase'
+import { enrollFree } from '../lib/userData'
 import { EXPERT_CREDENTIALS, pseudoRating, maskName } from '../data/mockMarketplace'
-import { getEbook, ebookDiscountPct, EBOOKS } from '../data/mockEbooks'
+import { ebookDiscountPct } from '../data/mockEbooks'
 import EbookCard from '../components/EbookCard'
+import PdfPreview from '../components/PdfPreview'
 
 // 전자책 후기 (목업)
 const REVIEWS = [
@@ -28,10 +32,34 @@ const TABS = [
 
 export default function AcademyEbookDetail() {
   const { id } = useParams()
-  const { experts } = useBizData()
+  const { experts, ebooks, getEbook } = useBizData()
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const ebook = getEbook(id ?? '')
-  // 데모: 무료책은 처음부터 열람, 유료책은 '구매하기'를 누르면 전체 열람(결제 연동 전)
-  const [unlocked, setUnlocked] = useState(false)
+  const [enrolled, setEnrolled] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  // 구매(수강) 여부
+  useEffect(() => {
+    if (!user || !supabase || !id) {
+      setEnrolled(false)
+      return
+    }
+    let active = true
+    supabase
+      .from('enrollments')
+      .select('item_id')
+      .eq('user_id', user.id)
+      .eq('item_type', 'ebook')
+      .eq('item_id', id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setEnrolled(!!data)
+      })
+    return () => {
+      active = false
+    }
+  }, [user, id])
 
   if (!ebook) {
     return (
@@ -39,7 +67,7 @@ export default function AcademyEbookDetail() {
         <div className="text-5xl">🤔</div>
         <h1 className="mt-4 text-2xl font-bold text-slate-900">전자책을 찾을 수 없어요</h1>
         <Link
-          to="/academy/ebooks"
+          to="/ebooks"
           className="mt-6 inline-block rounded-xl bg-violet-600 px-6 py-3 font-semibold text-white"
         >
           전자책 목록으로
@@ -50,11 +78,28 @@ export default function AcademyEbookDetail() {
 
   const isPaid = ebook.price > 0
   const off = ebookDiscountPct(ebook.price, ebook.originalPrice)
-  const canRead = !isPaid || unlocked
+  const canRead = enrolled
+  const previewPages = ebook.previewPages ?? 3
   // 저자명을 강사 데이터와 매칭해 약력/크리덴셜 재사용
   const authorExpert = experts.find((e) => e.name === ebook.author)
   const credentials = authorExpert ? EXPERT_CREDENTIALS[authorExpert.id] ?? [] : []
-  const related = EBOOKS.filter((e) => e.author === ebook.author && e.id !== ebook.id)
+  const related = ebooks.filter((e) => e.author === ebook.author && e.id !== ebook.id)
+
+  // 구매하기/읽기 — 구매자는 읽기 페이지로, 무료는 즉시 등록 후 읽기, 유료는 결제
+  const onPrimary = async () => {
+    if (!user) {
+      navigate('/auth?returnTo=' + encodeURIComponent(`/ebooks/${ebook.id}`))
+      return
+    }
+    if (enrolled) return navigate(`/read/${ebook.id}`)
+    if (isPaid) return navigate(`/checkout?type=ebook&id=${ebook.id}`)
+    setBusy(true)
+    const { error } = await enrollFree(user.id, 'ebook', ebook.id)
+    setBusy(false)
+    if (error) return alert('등록에 실패했습니다: ' + error)
+    setEnrolled(true)
+    navigate(`/read/${ebook.id}`)
+  }
 
   return (
     <div className="pb-28">
@@ -62,9 +107,15 @@ export default function AcademyEbookDetail() {
       <section className="border-b border-slate-200 bg-slate-50">
         <div className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-10 sm:px-6 md:grid-cols-2 md:py-14">
           <div
-            className={`grid aspect-video place-items-center rounded-2xl bg-gradient-to-br ${ebook.cover} text-7xl`}
+            className={`grid aspect-video place-items-center overflow-hidden rounded-2xl text-7xl ${
+              ebook.coverImage ? 'bg-slate-100' : `bg-gradient-to-br ${ebook.cover}`
+            }`}
           >
-            {ebook.emoji}
+            {ebook.coverImage ? (
+              <img src={ebook.coverImage} alt={ebook.title} className="h-full w-full object-cover" />
+            ) : (
+              ebook.emoji
+            )}
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -144,41 +195,68 @@ export default function AcademyEbookDetail() {
             </span>
           </div>
           <p className="mt-4 leading-relaxed text-slate-600">{ebook.summary}</p>
-          <div className="mt-6 grid aspect-[16/7] place-items-center rounded-2xl border border-slate-200 bg-slate-100 text-sm text-slate-400">
-            🖼️ 상세 이미지 영역 (저자가 편집)
-          </div>
+
+          {/* 리치 상세페이지 (저자 블록 에디터 — use_landing_page). 없으면 아무것도 안 보임 */}
+          {ebook.useLandingPage && (ebook.detailBlocks?.length ?? 0) > 0 && (
+            <div className="mt-6 space-y-4">
+              {ebook.detailBlocks!.map((b) =>
+                b.type === 'heading' ? (
+                  <h3 key={b.id} className="text-lg font-black text-slate-900">
+                    {b.value}
+                  </h3>
+                ) : b.type === 'text' ? (
+                  <p key={b.id} className="whitespace-pre-line leading-relaxed text-slate-600">
+                    {b.value}
+                  </p>
+                ) : b.value ? (
+                  <img
+                    key={b.id}
+                    src={b.value}
+                    alt=""
+                    className="w-full rounded-2xl border border-slate-200"
+                  />
+                ) : null,
+              )}
+            </div>
+          )}
         </section>
 
-        {/* 4. 미리보기 — 강의의 '커리큘럼/영상' 자리를 PDF 뷰어로 대체 */}
+        {/* 4. 미리보기 — 앞 N페이지만 공개 */}
         <section id="reader" className="scroll-mt-32">
-          <h2 className="text-xl font-black text-slate-900">{canRead ? '전체 읽기' : '미리보기'}</h2>
-          <p className="mt-1 text-sm text-slate-500">총 {ebook.pageCount}쪽</p>
-
-          <div className="relative mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-            <iframe
-              src={`${ebook.pdfUrl}#toolbar=0&navpanes=0&view=FitH`}
-              title={ebook.title}
-              className="h-[520px] w-full"
-            />
-            {!canRead && (
-              <div className="absolute inset-x-0 bottom-0 flex h-2/3 flex-col items-center justify-end bg-gradient-to-t from-white via-white/90 to-transparent p-6 text-center">
-                <div className="text-3xl">🔒</div>
-                <p className="mt-2 font-bold text-slate-800">미리보기는 여기까지예요</p>
-                <p className="mt-1 text-sm text-slate-500">
-                  구매하면 전체 {ebook.pageCount}쪽을 모두 읽을 수 있어요.
-                </p>
-                <button
-                  onClick={() => setUnlocked(true)}
-                  className="mt-4 rounded-xl bg-gradient-to-r from-violet-600 to-purple-500 px-6 py-2.5 font-bold text-white hover:opacity-90"
-                >
-                  {formatPrice(ebook.price)} · 구매하고 전체 읽기
-                </button>
-              </div>
-            )}
-          </div>
-          <p className="mt-2 text-xs text-slate-400">
-            * 데모용 샘플 PDF예요. 실제 전자책은 업로드한 파일로 표시됩니다.
+          <h2 className="text-xl font-black text-slate-900">미리보기</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            총 {ebook.pageCount}쪽 중 {previewPages}페이지 공개
           </p>
+
+          <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+            <PdfPreview url={ebook.pdfUrl} maxPages={previewPages} />
+
+            {/* 미리보기 종료 + CTA */}
+            <div className="border-t border-slate-200 bg-white px-6 py-8 text-center">
+              <div className="text-3xl">🔒</div>
+              <p className="mt-2 font-bold text-slate-800">
+                미리보기는 {previewPages}페이지까지예요
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {canRead
+                  ? `전체 ${ebook.pageCount}쪽을 읽을 수 있어요.`
+                  : `${isPaid ? '구매하면' : '무료로 받으면'} 전체 ${ebook.pageCount}쪽을 모두 읽을 수 있어요.`}
+              </p>
+              <button
+                onClick={onPrimary}
+                disabled={busy}
+                className="mt-4 rounded-xl bg-gradient-to-r from-violet-600 to-purple-500 px-6 py-2.5 font-bold text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {canRead
+                  ? '전체 읽기 →'
+                  : isPaid
+                    ? `${formatPrice(ebook.price)} · 구매하고 전체 읽기`
+                    : busy
+                      ? '등록 중…'
+                      : '무료로 전체 읽기'}
+              </button>
+            </div>
+          </div>
         </section>
 
         {/* 5. 저자소개 (강의의 '강사소개'와 동일) */}
@@ -306,21 +384,13 @@ export default function AcademyEbookDetail() {
             >
               미리보기
             </a>
-            {canRead ? (
-              <a
-                href="#reader"
-                className="flex h-11 items-center rounded-xl bg-gradient-to-r from-violet-600 to-purple-500 px-6 font-bold text-white hover:opacity-90"
-              >
-                바로 읽기
-              </a>
-            ) : (
-              <button
-                onClick={() => setUnlocked(true)}
-                className="h-11 rounded-xl bg-gradient-to-r from-violet-600 to-purple-500 px-6 font-bold text-white hover:opacity-90"
-              >
-                구매하기
-              </button>
-            )}
+            <button
+              onClick={onPrimary}
+              disabled={busy}
+              className="h-11 rounded-xl bg-gradient-to-r from-violet-600 to-purple-500 px-6 font-bold text-white hover:opacity-90 disabled:opacity-50"
+            >
+              {enrolled ? '바로 읽기' : isPaid ? '구매하기' : busy ? '등록 중…' : '무료로 읽기'}
+            </button>
           </div>
         </div>
       </div>
