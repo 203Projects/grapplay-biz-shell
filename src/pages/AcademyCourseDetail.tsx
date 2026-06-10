@@ -6,7 +6,7 @@ import { useAuth } from '../lib/auth'
 import { useWishlist } from '../lib/wishlist'
 import { supabase } from '../lib/supabase'
 import { enrollFree } from '../lib/userData'
-import { toEmbedUrl } from '../lib/video'
+import { toEmbedUrl, fetchVimeoPortrait } from '../lib/video'
 import CourseCard from '../components/CourseCard'
 import PurchaseBar from '../components/PurchaseBar'
 import {
@@ -486,11 +486,24 @@ function LessonPlayer({ course, activeIdx }: { course: Course; activeIdx: number
   const lesson = course.curriculum[activeIdx]
   const embed = toEmbedUrl(lesson?.videoUrl)
 
+  // 세로영상이면 9:16 가운데 정렬, 아니면 기본 16:9
+  const [portrait, setPortrait] = useState(false)
+  useEffect(() => {
+    setPortrait(false)
+    let active = true
+    fetchVimeoPortrait(lesson?.videoUrl).then((p) => {
+      if (active && p) setPortrait(true)
+    })
+    return () => {
+      active = false
+    }
+  }, [lesson?.videoUrl])
+
   return (
     <div>
       {/* 영상 영역 */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-black">
-        <div className="aspect-video">
+        <div className={portrait ? 'mx-auto aspect-[9/16] h-[70vh] max-w-full' : 'aspect-video'}>
           {embed ? (
             <iframe
               key={embed}

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Navigate, Link } from 'react-router-dom'
 import { useBizData } from '../lib/useBizData'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
-import { toEmbedUrl } from '../lib/video'
+import { toEmbedUrl, fetchVimeoPortrait } from '../lib/video'
 
 type Tab = '내용' | '목차' | '공지'
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -27,6 +27,20 @@ export default function AcademyCourseLearn() {
   const [enrolled, setEnrolled] = useState<boolean | null>(null)
   const [idx, setIdx] = useState(0)
   const [tab, setTab] = useState<Tab>('내용')
+  const [portrait, setPortrait] = useState(false)
+
+  // 현재 레슨 영상이 세로면 9:16 가운데 정렬, 아니면 기본 16:9
+  const lessonUrl = course?.curriculum[idx]?.videoUrl
+  useEffect(() => {
+    setPortrait(false) // 레슨 바뀌면 일단 가로(기본)로
+    let active = true
+    fetchVimeoPortrait(lessonUrl).then((p) => {
+      if (active && p) setPortrait(true)
+    })
+    return () => {
+      active = false
+    }
+  }, [lessonUrl])
 
   useEffect(() => {
     if (!user || !supabase || !id) {
@@ -92,7 +106,13 @@ export default function AcademyCourseLearn() {
       {/* 영상 */}
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-black">
-          <div className="aspect-video">
+          <div
+            className={
+              portrait
+                ? 'mx-auto aspect-[9/16] h-[70vh] max-w-full'
+                : 'aspect-video'
+            }
+          >
             {embed ? (
               <iframe
                 key={embed}
