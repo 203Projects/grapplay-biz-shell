@@ -7,6 +7,7 @@ export interface Profile {
   role: 'user' | 'expert' | 'admin'
   expert_id: string | null
   display_name: string | null
+  avatar_url: string | null
 }
 
 interface AuthCtx {
@@ -19,9 +20,31 @@ interface AuthCtx {
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>
   signInWithKakao: () => Promise<{ error: string | null }>
   signOut: () => Promise<void>
+  refreshProfile: () => Promise<void>
 }
 
 const Ctx = createContext<AuthCtx | null>(null)
+
+// 프로필 조회 — avatar_url 컬럼이 아직 마이그레이션 안 됐어도 깨지지 않도록 폴백.
+// (avatar_url 미적용 시 명시적 select가 에러 → 축소 컬럼으로 재조회)
+async function fetchProfile(userId: string): Promise<Profile | null> {
+  if (!supabase) return null
+  const full = await supabase
+    .from('profiles')
+    .select('role, expert_id, display_name, avatar_url')
+    .eq('id', userId)
+    .single()
+  if (!full.error) return (full.data as Profile) ?? null
+
+  // avatar_url 컬럼 부재 등으로 실패 시 핵심 컬럼만 재조회
+  const basic = await supabase
+    .from('profiles')
+    .select('role, expert_id, display_name')
+    .eq('id', userId)
+    .single()
+  if (basic.error || !basic.data) return null
+  return { ...(basic.data as Omit<Profile, 'avatar_url'>), avatar_url: null }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
@@ -51,18 +74,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
     let cancelled = false
-    supabase
-      .from('profiles')
-      .select('role, expert_id, display_name')
-      .eq('id', session.user.id)
-      .single()
-      .then(({ data }) => {
-        if (!cancelled) setProfile((data as Profile) ?? null)
-      })
+    fetchProfile(session.user.id).then((p) => {
+      if (!cancelled) setProfile(p)
+    })
     return () => {
       cancelled = true
     }
   }, [session])
+
+  // 프로필 수정(마이페이지) 후 다시 읽어 헤더/마이페이지에 즉시 반영
+  const refreshProfile: AuthCtx['refreshProfile'] = async () => {
+    if (!supabase || !session) return
+    setProfile(await fetchProfile(session.user.id))
+  }
 
   const signInWithPassword: AuthCtx['signInWithPassword'] = async (email, password) => {
     if (!supabase) return { error: '로그인이 아직 설정되지 않았습니다.' }
@@ -104,6 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signInWithKakao,
     signOut,
+    refreshProfile,
   }
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

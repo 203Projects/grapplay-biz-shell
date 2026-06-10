@@ -26,8 +26,8 @@ export default function AcademyLayout({ children }: { children: React.ReactNode 
   // 역할별 대시보드 메뉴를 상단 메뉴에 추가
   const menu = [
     ...MENU,
-    ...(profile?.role === 'expert' && profile.expert_id
-      ? [{ to: '/expert/dashboard', label: '전문가 대시보드' }]
+    ...((profile?.role === 'expert' && profile.expert_id) || profile?.role === 'admin'
+      ? [{ to: '/expert/dashboard', label: '지도자 대시보드' }]
       : []),
     ...(profile?.role === 'admin' ? [{ to: '/admin', label: '관리자 대시보드' }] : []),
   ]
@@ -56,7 +56,7 @@ export default function AcademyLayout({ children }: { children: React.ReactNode 
             </Link>
 
             {/* 검색창 (데스크톱 중앙) — 통합검색으로 이동 */}
-            <form onSubmit={onSearch} className="relative hidden min-w-0 flex-1 md:block">
+            <form onSubmit={onSearch} className="relative hidden min-w-0 md:block md:w-64 lg:w-80">
               <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                 🔍
               </span>
@@ -160,14 +160,14 @@ export default function AcademyLayout({ children }: { children: React.ReactNode 
             </p>
             <p>
               <strong className="text-slate-500">사업자등록번호:</strong> 111-39-34149 |{' '}
-              <strong className="text-slate-500">통신판매업 신고번호:</strong> 진행 중
+              <strong className="text-slate-500">통신판매업 신고번호:</strong> 2026-서울동작-0405
             </p>
             <p>
               <strong className="text-slate-500">주소:</strong> 서울 동작구 동작대로29길 119,
               102-1207
             </p>
             <p>
-              <strong className="text-slate-500">이메일:</strong> coach0179@naver.com |{' '}
+              <strong className="text-slate-500">이메일:</strong> grapplay.com@gmail.com |{' '}
               <strong className="text-slate-500">전화번호:</strong> 02-599-6315
             </p>
           </div>
@@ -191,15 +191,9 @@ function HeaderUtil() {
       <div className="ml-auto flex items-center gap-1 text-sm">
         <Link
           to="/auth"
-          className="hidden rounded-lg px-3 py-2 font-medium text-slate-600 hover:bg-slate-100 sm:block"
+          className="rounded-lg bg-zinc-900 px-4 py-2 font-semibold text-white hover:bg-zinc-800"
         >
           로그인
-        </Link>
-        <Link
-          to="/auth?mode=signup"
-          className="rounded-lg bg-gradient-to-r from-violet-600 to-purple-500 px-4 py-2 font-semibold text-white hover:opacity-90"
-        >
-          시작하기
         </Link>
       </div>
     )
@@ -207,6 +201,7 @@ function HeaderUtil() {
 
   const name = profile?.display_name || session.user.email || '회원'
   const initial = name.trim().charAt(0).toUpperCase()
+  const avatarUrl = profile?.avatar_url
 
   return (
     <div className="relative ml-auto flex items-center gap-1 text-sm">
@@ -214,9 +209,17 @@ function HeaderUtil() {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-100"
       >
-        <span className="grid h-8 w-8 place-items-center rounded-full bg-violet-100 font-bold text-violet-700">
-          {initial}
-        </span>
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt=""
+            className="h-8 w-8 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-violet-100 font-bold text-violet-700">
+            {initial}
+          </span>
+        )}
       </button>
 
       {open && (
@@ -233,7 +236,8 @@ function HeaderUtil() {
             <MenuLink to="/my?tab=orders" onClick={() => setOpen(false)}>
               주문/결제
             </MenuLink>
-            {profile?.role === 'expert' && profile.expert_id && (
+            {((profile?.role === 'expert' && profile.expert_id) ||
+              profile?.role === 'admin') && (
               <MenuLink to="/expert/dashboard" onClick={() => setOpen(false)}>
                 지도자 대시보드
               </MenuLink>

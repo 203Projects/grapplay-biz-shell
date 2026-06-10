@@ -9,7 +9,8 @@ import {
   type ExpertReview,
   type CourseReview,
 } from '../data/mock'
-import { EBOOKS, type Ebook } from '../data/mockEbooks'
+import { EBOOKS, EBOOK_REVIEWS, type Ebook, type EbookReview } from '../data/mockEbooks'
+import { PROMO_BANNERS, type PromoBanner } from '../data/mockMarketplace'
 
 export interface BizData {
   courses: Course[]
@@ -17,13 +18,54 @@ export interface BizData {
   expertReviews: ExpertReview[]
   courseReviews: CourseReview[]
   ebooks: Ebook[]
+  ebookReviews: EbookReview[]
+  banners: PromoBanner[]
   /** true면 실제 Supabase, false면 목업 폴백 */
   live: boolean
 }
 
 /* ── 행 → 타입 매퍼 ── */
 function mapExpert(r: any): Expert {
-  return { id: r.id, name: r.name, title: r.title, avatar: r.avatar, bio: r.bio, category: r.category ?? undefined }
+  return {
+    id: r.id,
+    name: r.name,
+    title: r.title,
+    avatar: r.avatar,
+    avatarUrl: r.avatar_url ?? undefined,
+    bio: r.bio,
+    category: r.category ?? undefined,
+    categories:
+      Array.isArray(r.categories) && r.categories.length
+        ? r.categories
+        : r.category
+          ? [r.category]
+          : [],
+    credentials: Array.isArray(r.credentials) ? r.credentials : [],
+  }
+}
+
+function mapEbookReview(r: any): EbookReview {
+  return {
+    id: r.id,
+    ebookId: r.ebook_id,
+    userName: r.user_name,
+    userEmail: r.user_email ?? '',
+    content: r.content,
+    rating: typeof r.rating === 'number' ? r.rating : undefined,
+    createdAt: r.created_at,
+    hidden: r.hidden,
+  }
+}
+
+function mapBanner(r: any): PromoBanner {
+  return {
+    id: r.id,
+    title: r.title,
+    subtitle: r.subtitle ?? '',
+    gradient: r.gradient ?? 'from-violet-600 to-purple-500',
+    cta: r.cta ?? '',
+    link: r.link ?? undefined,
+  }
 }
 
 function mapCourse(r: any): Course {
@@ -71,6 +113,7 @@ function mapCourseReview(r: any): CourseReview {
     userName: r.user_name,
     userEmail: r.user_email,
     content: r.content,
+    rating: typeof r.rating === 'number' ? r.rating : undefined,
     createdAt: r.created_at,
     hidden: r.hidden,
     pdfSentCount: r.pdf_sent_count,
@@ -113,6 +156,8 @@ export async function fetchBizData(): Promise<BizData> {
       expertReviews: EXPERT_REVIEWS,
       courseReviews: COURSE_REVIEWS,
       ebooks: EBOOKS,
+      ebookReviews: EBOOK_REVIEWS,
+      banners: PROMO_BANNERS,
       live: false,
     }
   }
@@ -136,9 +181,29 @@ export async function fetchBizData(): Promise<BizData> {
       expertReviews: EXPERT_REVIEWS,
       courseReviews: COURSE_REVIEWS,
       ebooks: EBOOKS,
+      ebookReviews: EBOOK_REVIEWS,
+      banners: PROMO_BANNERS,
       live: false,
     }
   }
+
+  // 배너·전자책리뷰는 별도(방어적) 조회 — 미마이그레이션이어도 나머지는 라이브 유지
+  let banners: PromoBanner[] = PROMO_BANNERS
+  const bannersRes = await supabase
+    .from('banners')
+    .select('*')
+    .eq('active', true)
+    .order('sort_order', { ascending: true })
+  if (!bannersRes.error && (bannersRes.data?.length ?? 0) > 0) {
+    banners = bannersRes.data!.map(mapBanner)
+  }
+
+  let ebookReviews: EbookReview[] = []
+  const ebrRes = await supabase
+    .from('ebook_reviews')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (!ebrRes.error) ebookReviews = (ebrRes.data ?? []).map(mapEbookReview)
 
   return {
     courses: (coursesRes.data ?? []).map(mapCourse),
@@ -146,6 +211,8 @@ export async function fetchBizData(): Promise<BizData> {
     expertReviews: (erRes.data ?? []).map(mapExpertReview),
     courseReviews: (crRes.data ?? []).map(mapCourseReview),
     ebooks: (ebooksRes.data ?? []).map(mapEbook),
+    ebookReviews,
+    banners,
     live: true,
   }
 }

@@ -7,11 +7,12 @@ import ExpertsTab from './tabs/ExpertsTab'
 import ContentTab from './tabs/ContentTab'
 import OrdersTab from './tabs/OrdersTab'
 import ReviewsTab from './tabs/ReviewsTab'
+import BannerTab from './tabs/BannerTab'
 
 // 관리자 대시보드 — 단일 페이지 + 내부 탭 (전문가 대시보드 패턴 미러링).
 // 접근 권한은 ProtectedRoute requireAdmin + RLS is_admin()이 이중으로 강제한다.
-type Tab = '개요' | '정산' | '회원' | '전문가' | '콘텐츠' | '주문' | '리뷰'
-const TABS: Tab[] = ['개요', '정산', '회원', '전문가', '콘텐츠', '주문', '리뷰']
+type Tab = '개요' | '정산' | '회원' | '전문가' | '콘텐츠' | '주문' | '리뷰' | '배너'
+const TABS: Tab[] = ['개요', '정산', '회원', '전문가', '콘텐츠', '주문', '리뷰', '배너']
 
 export default function AdminDashboard() {
   const { profile, session } = useAuth()
@@ -62,6 +63,7 @@ export default function AdminDashboard() {
         {tab === '콘텐츠' && <ContentTab />}
         {tab === '주문' && <OrdersTab />}
         {tab === '리뷰' && <ReviewsTab />}
+        {tab === '배너' && <BannerTab />}
       </div>
     </div>
   )

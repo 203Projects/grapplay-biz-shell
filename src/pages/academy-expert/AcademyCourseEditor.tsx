@@ -7,12 +7,17 @@ import { createCourse, updateCourse, type CourseInput } from '../../lib/expertAp
 import { uploadVideoToVimeo } from '../../lib/vimeo'
 import { supabase } from '../../lib/supabase'
 import { uploadToCovers } from '../../lib/storage'
+import BlockStyleToolbar, { type BlockStyle } from '../../components/BlockStyleToolbar'
 
 type BlockType = 'heading' | 'text' | 'image'
 interface Block {
   id: number
   type: BlockType
   value: string
+  size?: BlockStyle['size']
+  weight?: BlockStyle['weight']
+  color?: BlockStyle['color']
+  align?: BlockStyle['align']
 }
 
 let blockSeq = 100
@@ -174,6 +179,9 @@ function EditorForm({ existing, isEdit }: { existing?: Course; isEdit: boolean }
   }
   function updateBlock(id: number, value: string) {
     setBlocks((b) => b.map((x) => (x.id === id ? { ...x, value } : x)))
+  }
+  function updateBlockStyle(id: number, patch: BlockStyle) {
+    setBlocks((b) => b.map((x) => (x.id === id ? { ...x, ...patch } : x)))
   }
   function removeBlock(id: number) {
     setBlocks((b) => b.filter((x) => x.id !== id))
@@ -597,20 +605,34 @@ function EditorForm({ existing, isEdit }: { existing?: Course; isEdit: boolean }
                       </label>
                     </div>
                   ) : b.type === 'heading' ? (
-                    <input
-                      value={b.value}
-                      onChange={(e) => updateBlock(b.id, e.target.value)}
-                      placeholder="제목을 입력하세요"
-                      className="w-full rounded-lg border border-stone-200 px-3 py-2 text-lg font-bold outline-none focus:border-amber-400"
-                    />
+                    <div className="space-y-2">
+                      <BlockStyleToolbar
+                        value={b}
+                        onChange={(patch) => updateBlockStyle(b.id, patch)}
+                      />
+                      <input
+                        value={b.value}
+                        onChange={(e) => updateBlock(b.id, e.target.value)}
+                        placeholder="제목을 입력하세요"
+                        style={b.color ? { color: b.color } : undefined}
+                        className="w-full rounded-lg border border-stone-200 px-3 py-2 text-lg font-bold outline-none focus:border-amber-400"
+                      />
+                    </div>
                   ) : (
-                    <textarea
-                      value={b.value}
-                      onChange={(e) => updateBlock(b.id, e.target.value)}
-                      placeholder="본문을 입력하세요"
-                      rows={3}
-                      className="w-full resize-none rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-amber-400"
-                    />
+                    <div className="space-y-2">
+                      <BlockStyleToolbar
+                        value={b}
+                        onChange={(patch) => updateBlockStyle(b.id, patch)}
+                      />
+                      <textarea
+                        value={b.value}
+                        onChange={(e) => updateBlock(b.id, e.target.value)}
+                        placeholder="본문을 입력하세요"
+                        rows={3}
+                        style={b.color ? { color: b.color } : undefined}
+                        className="w-full resize-none rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-amber-400"
+                      />
+                    </div>
                   )}
                 </div>
               ))}

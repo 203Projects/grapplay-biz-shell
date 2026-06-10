@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { formatPrice, type CourseReview } from '../../data/mock'
 import { useBizData, invalidateBizData } from '../../lib/useBizData'
 import { useAuth } from '../../lib/auth'
+import ExpertAvatar from '../../components/ExpertAvatar'
+import ExpertProfileEditor from '../../components/ExpertProfileEditor'
 import {
   setReviewHidden,
   incrementPdfSent,
@@ -18,15 +20,23 @@ import {
   type PayoutAccount,
 } from '../../lib/expertApi'
 
-type Tab = '내 강의' | '내 전자책' | '리뷰 관리' | '수익 분석' | '정산'
-const TABS: Tab[] = ['내 강의', '내 전자책', '리뷰 관리', '수익 분석', '정산']
+type Tab = '내 강의' | '내 전자책' | '리뷰 관리' | '수익 분석' | '정산' | '프로필'
+const TABS: Tab[] = ['내 강의', '내 전자책', '리뷰 관리', '수익 분석', '정산', '프로필']
 
 export default function AcademyExpertDashboard() {
-  const { getExpert, getExpertStats, loading } = useBizData()
+  const { getExpert, getExpertStats, refetch, loading, experts } = useBizData()
   const { profile } = useAuth()
-  const expertId = profile?.expert_id ?? ''
+  const isAdmin = profile?.role === 'admin'
   const [tab, setTab] = useState<Tab>('내 강의')
   const [revenue, setRevenue] = useState<ExpertRevenue | null>(null)
+  // 관리자는 자신의 expert_id가 없으므로, 관리할 지도자를 직접 선택한다.
+  const [adminExpertId, setAdminExpertId] = useState('')
+  const expertId = isAdmin ? adminExpertId : (profile?.expert_id ?? '')
+
+  // 관리자: 지도자 목록이 로드되면 첫 지도자를 기본 선택
+  useEffect(() => {
+    if (isAdmin && !adminExpertId && experts.length) setAdminExpertId(experts[0].id)
+  }, [isAdmin, adminExpertId, experts])
 
   const expert = getExpert(expertId)
   const stats = getExpertStats(expertId)
@@ -35,6 +45,15 @@ export default function AcademyExpertDashboard() {
     if (!expertId) return
     getExpertRevenue(expertId).then(setRevenue)
   }, [expertId])
+
+  // 관리자인데 선택 가능한 지도자가 아직 없을 때
+  if (isAdmin && !loading && experts.length === 0) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-16 text-center text-sm text-stone-500 sm:px-6">
+        등록된 지도자가 없습니다.
+      </div>
+    )
+  }
 
   if (loading || !expert) {
     return (
@@ -51,12 +70,28 @@ export default function AcademyExpertDashboard() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      {/* 관리자: 관리할 지도자 선택 */}
+      {isAdmin && (
+        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+          <span className="text-sm font-semibold text-indigo-700">관리자 모드 · 지도자 선택</span>
+          <select
+            value={adminExpertId}
+            onChange={(e) => setAdminExpertId(e.target.value)}
+            className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-800 outline-none focus:border-indigo-500"
+          >
+            {experts.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* 헤더 */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <div className="grid h-14 w-14 place-items-center rounded-full bg-amber-100 text-3xl">
-            {expert.avatar}
-          </div>
+          <ExpertAvatar emoji={expert.avatar} src={expert.avatarUrl} size={56} />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-black text-stone-900">{expert.name}</h1>
@@ -69,6 +104,7 @@ export default function AcademyExpertDashboard() {
         </div>
         <Link
           to="/expert/courses/new"
+          state={{ expertId }}
           className="rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3 text-center font-bold text-stone-900 hover:opacity-90"
         >
           + 새 강의 만들기
@@ -78,14 +114,22 @@ export default function AcademyExpertDashboard() {
       {/* 요약 통계 */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="총 강의" value={`${stats.courseCount}개`} icon="📚" />
-        <StatCard label="총 수강생" value={`${stats.studentCount.toLocaleString()}명`} icon="👥" />
+        <StatCard
+          label="총 수강생"
+          value={revenue ? `${revenue.students.toLocaleString()}명` : '—'}
+          icon="👥"
+        />
         <StatCard
           label="누적 매출"
           value={revenue ? formatPrice(revenue.total) : '—'}
           icon="💰"
           accent
         />
-        <StatCard label="평균 평점" value={`⭐ ${stats.rating.toFixed(1)}`} icon="" />
+        <StatCard
+          label="평균 평점"
+          value={stats.reviewCount ? `⭐ ${stats.rating.toFixed(1)} (${stats.reviewCount})` : '후기 없음'}
+          icon=""
+        />
       </div>
 
       {/* 탭 */}
@@ -106,11 +150,18 @@ export default function AcademyExpertDashboard() {
       </div>
 
       <div className="mt-8">
-        {tab === '내 강의' && <MyCoursesTab expertId={expertId} />}
+        {tab === '내 강의' && (
+          <MyCoursesTab expertId={expertId} studentsByCourse={revenue?.studentsByCourse ?? {}} />
+        )}
         {tab === '내 전자책' && <MyEbooksTab expertId={expertId} />}
         {tab === '리뷰 관리' && <ReviewsTab expertId={expertId} />}
         {tab === '수익 분석' && <RevenueTab revenue={revenue} />}
         {tab === '정산' && <PayoutTab expertId={expertId} expertName={expert.name} />}
+        {tab === '프로필' && (
+          <div className="max-w-2xl">
+            <ExpertProfileEditor expertId={expertId} initial={expert} onSaved={refetch} />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -142,13 +193,22 @@ function StatCard({
 }
 
 /* ── 내 강의 탭 ── */
-function MyCoursesTab({ expertId }: { expertId: string }) {
-  const { getCoursesByExpert } = useBizData()
+function MyCoursesTab({
+  expertId,
+  studentsByCourse,
+}: {
+  expertId: string
+  studentsByCourse: Record<string, number>
+}) {
+  const { getCoursesByExpert, getCourseRating } = useBizData()
   const courses = getCoursesByExpert(expertId)
 
   return (
     <div className="space-y-3">
-      {courses.map((c) => (
+      {courses.map((c) => {
+        const { rating, count } = getCourseRating(c.id)
+        const students = studentsByCourse[c.id] ?? 0
+        return (
         <div
           key={c.id}
           className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-4 sm:flex-row sm:items-center"
@@ -165,9 +225,9 @@ function MyCoursesTab({ expertId }: { expertId: string }) {
             <h3 className="mt-0.5 font-bold text-stone-900">{c.title}</h3>
             <div className="mt-1 flex flex-wrap gap-3 text-xs text-stone-400">
               <span>{formatPrice(c.price)}</span>
-              <span>· 수강 {c.studentCount.toLocaleString()}명</span>
+              <span>· 수강 {students.toLocaleString()}명</span>
               <span>· {c.lessonCount}강</span>
-              <span>· ⭐ {c.rating.toFixed(1)}</span>
+              <span>· {count ? `⭐ ${rating.toFixed(1)} (${count})` : '후기 없음'}</span>
             </div>
           </div>
           <div className="flex gap-2">
@@ -185,7 +245,8 @@ function MyCoursesTab({ expertId }: { expertId: string }) {
             </Link>
           </div>
         </div>
-      ))}
+        )
+      })}
 
       {courses.length === 0 && (
         <div className="rounded-2xl border border-dashed border-stone-300 bg-white py-12 text-center text-sm text-stone-500">
@@ -195,6 +256,7 @@ function MyCoursesTab({ expertId }: { expertId: string }) {
 
       <Link
         to="/expert/courses/new"
+        state={{ expertId }}
         className="flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-stone-300 bg-white py-8 font-semibold text-stone-500 hover:border-amber-300 hover:text-amber-600"
       >
         + 새 강의 만들기
@@ -253,6 +315,7 @@ function MyEbooksTab({ expertId }: { expertId: string }) {
 
       <Link
         to="/expert/ebooks/new"
+        state={{ expertId }}
         className="flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-stone-300 bg-white py-8 font-semibold text-stone-500 hover:border-amber-300 hover:text-amber-600"
       >
         + 새 전자책 만들기

@@ -3,19 +3,14 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { formatPrice } from '../data/mock'
 import { useBizData } from '../lib/useBizData'
 import { useAuth } from '../lib/auth'
+import { blockClass, blockStyle } from '../lib/detailBlocks'
 import { supabase } from '../lib/supabase'
-import { enrollFree } from '../lib/userData'
-import { EXPERT_CREDENTIALS, pseudoRating, maskName } from '../data/mockMarketplace'
+import { enrollFree, addEbookReview } from '../lib/userData'
+import { EXPERT_CREDENTIALS } from '../data/mockMarketplace'
 import { ebookDiscountPct } from '../data/mockEbooks'
 import EbookCard from '../components/EbookCard'
 import PdfPreview from '../components/PdfPreview'
-
-// 전자책 후기 (목업)
-const REVIEWS = [
-  { id: 'er_a', name: '관장 J', text: '바로 써먹을 수 있는 내용이라 좋았어요. 실무에 딱입니다.' },
-  { id: 'er_b', name: '도장 운영 K', text: '정리가 깔끔해서 이해가 빨라요. 분량도 적당합니다.' },
-  { id: 'er_c', name: '예비 창업 P', text: '이 가격에 이 정보면 충분히 만족합니다. 추천해요.' },
-]
+import ReviewSection from '../components/ReviewSection'
 
 const NOTICES = [
   '전자책은 구매 후 마이페이지 > 내 자료에서 다시 열람할 수 있습니다.',
@@ -32,8 +27,8 @@ const TABS = [
 
 export default function AcademyEbookDetail() {
   const { id } = useParams()
-  const { experts, ebooks, getEbook } = useBizData()
-  const { user } = useAuth()
+  const { experts, ebooks, getEbook, getEbookReviews, getEbookRating, refetch } = useBizData()
+  const { user, profile } = useAuth()
   const navigate = useNavigate()
   const ebook = getEbook(id ?? '')
   const [enrolled, setEnrolled] = useState(false)
@@ -68,7 +63,7 @@ export default function AcademyEbookDetail() {
         <h1 className="mt-4 text-2xl font-bold text-slate-900">전자책을 찾을 수 없어요</h1>
         <Link
           to="/ebooks"
-          className="mt-6 inline-block rounded-xl bg-violet-600 px-6 py-3 font-semibold text-white"
+          className="mt-6 inline-block rounded-xl bg-zinc-900 px-6 py-3 font-semibold text-white hover:bg-zinc-800"
         >
           전자책 목록으로
         </Link>
@@ -82,8 +77,29 @@ export default function AcademyEbookDetail() {
   const previewPages = ebook.previewPages ?? 3
   // 저자명을 강사 데이터와 매칭해 약력/크리덴셜 재사용
   const authorExpert = experts.find((e) => e.name === ebook.author)
-  const credentials = authorExpert ? EXPERT_CREDENTIALS[authorExpert.id] ?? [] : []
+  const credentials = authorExpert?.credentials?.length
+    ? authorExpert.credentials
+    : authorExpert
+      ? EXPERT_CREDENTIALS[authorExpert.id] ?? []
+      : []
   const related = ebooks.filter((e) => e.author === ebook.author && e.id !== ebook.id)
+
+  // 실제 후기 기반 평점 + 작성
+  const ebookReviews = getEbookReviews(ebook.id).filter((r) => !r.hidden)
+  const { rating: avgRating, count: ratingCount } = getEbookRating(ebook.id)
+  const myEmail = user?.email ?? ''
+  const alreadyWrote = !!myEmail && ebookReviews.some((r) => r.userEmail === myEmail)
+  const submitReview = (rating: number, content: string) =>
+    addEbookReview({
+      ebookId: ebook.id,
+      userName: profile?.display_name || myEmail || '독자',
+      userEmail: myEmail,
+      content,
+      rating,
+    }).then((res) => {
+      if (!res.error) refetch()
+      return res
+    })
 
   // 구매하기/읽기 — 구매자는 읽기 페이지로, 무료는 즉시 등록 후 읽기, 유료는 결제
   const onPrimary = async () => {
@@ -141,11 +157,13 @@ export default function AcademyEbookDetail() {
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-500">
-              <span className="font-semibold text-amber-400">
-                ★ <span className="text-slate-700">{ebook.rating.toFixed(1)}</span>
-              </span>
-              <span>· 구매 {ebook.buyerCount.toLocaleString()}명</span>
-              <span>· {ebook.pageCount}쪽</span>
+              {ratingCount > 0 && (
+                <span className="font-semibold text-amber-400">
+                  ★ <span className="text-slate-700">{avgRating.toFixed(1)}</span>
+                  <span className="text-slate-400"> ({ratingCount})</span>
+                </span>
+              )}
+              <span>{ebook.pageCount}쪽</span>
             </div>
 
             <div className="mt-5 flex items-end gap-2">
@@ -201,11 +219,19 @@ export default function AcademyEbookDetail() {
             <div className="mt-6 space-y-4">
               {ebook.detailBlocks!.map((b) =>
                 b.type === 'heading' ? (
-                  <h3 key={b.id} className="text-lg font-black text-slate-900">
+                  <h3
+                    key={b.id}
+                    className={`${blockClass(b)} ${b.color ? '' : 'text-slate-900'}`}
+                    style={blockStyle(b)}
+                  >
                     {b.value}
                   </h3>
                 ) : b.type === 'text' ? (
-                  <p key={b.id} className="whitespace-pre-line leading-relaxed text-slate-600">
+                  <p
+                    key={b.id}
+                    className={`whitespace-pre-line leading-relaxed ${blockClass(b)} ${b.color ? '' : 'text-slate-600'}`}
+                    style={blockStyle(b)}
+                  >
                     {b.value}
                   </p>
                 ) : b.value ? (
@@ -245,7 +271,7 @@ export default function AcademyEbookDetail() {
               <button
                 onClick={onPrimary}
                 disabled={busy}
-                className="mt-4 rounded-xl bg-gradient-to-r from-violet-600 to-purple-500 px-6 py-2.5 font-bold text-white hover:opacity-90 disabled:opacity-50"
+                className="mt-4 rounded-xl bg-zinc-900 px-6 py-2.5 font-bold text-white hover:bg-zinc-800 disabled:opacity-50"
               >
                 {canRead
                   ? '전체 읽기 →'
@@ -307,28 +333,16 @@ export default function AcademyEbookDetail() {
           </div>
         </section>
 
-        {/* 7. 후기 */}
-        <section id="reviews" className="scroll-mt-32">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-xl font-black text-slate-900">독자 후기</h2>
-            <span className="text-sm text-slate-500">
-              <span className="font-bold text-amber-400">★</span>{' '}
-              <span className="font-semibold text-slate-700">{ebook.rating.toFixed(1)}</span> ·{' '}
-              {REVIEWS.length}개
-            </span>
-          </div>
-          <div className="mt-4 space-y-3">
-            {REVIEWS.map((r) => (
-              <div key={r.id} className="rounded-2xl border border-slate-200 bg-white p-5">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-800">{maskName(r.name)}</span>
-                </div>
-                <div className="mt-1 text-amber-400">{'★'.repeat(pseudoRating(r.id))}</div>
-                <p className="mt-2 leading-relaxed text-slate-600">{r.text}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+        {/* 7. 후기 — 실제 별점+후기 */}
+        <ReviewSection
+          title="독자 후기"
+          items={ebookReviews}
+          avg={avgRating}
+          count={ratingCount}
+          canWrite={enrolled}
+          alreadyWrote={alreadyWrote}
+          onSubmit={submitReview}
+        />
 
         {/* 9. 주의사항 */}
         <section className="scroll-mt-32">
@@ -387,7 +401,7 @@ export default function AcademyEbookDetail() {
             <button
               onClick={onPrimary}
               disabled={busy}
-              className="h-11 rounded-xl bg-gradient-to-r from-violet-600 to-purple-500 px-6 font-bold text-white hover:opacity-90 disabled:opacity-50"
+              className="h-11 rounded-xl bg-zinc-900 px-6 font-bold text-white hover:bg-zinc-800 disabled:opacity-50"
             >
               {enrolled ? '바로 읽기' : isPaid ? '구매하기' : busy ? '등록 중…' : '무료로 읽기'}
             </button>

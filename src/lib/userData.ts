@@ -3,6 +3,67 @@ import { supabase } from './supabase'
 // 사용자 데이터(수강/위시/주문) read + 위시·무료수강 mutation
 export type ItemType = 'course' | 'ebook'
 
+// 후기 작성 — 구매(수강)자만. 별점(1~5) + 텍스트. RLS가 enrolled 여부를 강제한다.
+export async function addCourseReview(input: {
+  courseId: string
+  userName: string
+  userEmail: string
+  content: string
+  rating: number
+}) {
+  if (!supabase) return { error: '연결이 설정되지 않았습니다.' }
+  const { error } = await supabase.from('course_reviews').insert({
+    id: `cr_${crypto.randomUUID().slice(0, 8)}`,
+    course_id: input.courseId,
+    user_name: input.userName,
+    user_email: input.userEmail,
+    content: input.content,
+    rating: input.rating,
+    hidden: false,
+    pdf_sent_count: 0,
+    created_at: new Date().toISOString().slice(0, 10),
+  })
+  return { error: error?.message ?? null }
+}
+
+export async function addEbookReview(input: {
+  ebookId: string
+  userName: string
+  userEmail: string
+  content: string
+  rating: number
+}) {
+  if (!supabase) return { error: '연결이 설정되지 않았습니다.' }
+  const { error } = await supabase.from('ebook_reviews').insert({
+    id: `ebr_${crypto.randomUUID().slice(0, 8)}`,
+    ebook_id: input.ebookId,
+    user_name: input.userName,
+    user_email: input.userEmail,
+    content: input.content,
+    rating: input.rating,
+    hidden: false,
+    created_at: new Date().toISOString().slice(0, 10),
+  })
+  return { error: error?.message ?? null }
+}
+
+// 마이페이지 — 본인 프로필(이름/사진) 수정. RLS가 본인 행만 허용.
+export async function updateMyProfile(
+  userId: string,
+  patch: { display_name?: string; avatar_url?: string | null },
+) {
+  if (!supabase) return { error: '연결이 설정되지 않았습니다.' }
+  let res = await supabase.from('profiles').update(patch).eq('id', userId).select('id')
+  // avatar_url 컬럼 미마이그레이션 시: 사진 제외하고 이름만이라도 저장
+  if (res.error && 'avatar_url' in patch) {
+    const { avatar_url: _omit, ...rest } = patch
+    res = await supabase.from('profiles').update(rest).eq('id', userId).select('id')
+  }
+  if (res.error) return { error: res.error.message }
+  if (!res.data || res.data.length === 0) return { error: '프로필을 수정할 수 없습니다.' }
+  return { error: null }
+}
+
 export interface EnrollmentRow {
   item_type: ItemType
   item_id: string

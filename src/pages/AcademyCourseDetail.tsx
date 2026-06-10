@@ -4,18 +4,15 @@ import { formatPrice, type Course } from '../data/mock'
 import { useBizData } from '../lib/useBizData'
 import { useAuth } from '../lib/auth'
 import { useWishlist } from '../lib/wishlist'
+import { blockClass, blockStyle } from '../lib/detailBlocks'
 import { supabase } from '../lib/supabase'
-import { enrollFree } from '../lib/userData'
+import { enrollFree, addCourseReview } from '../lib/userData'
 import { toEmbedUrl, fetchVimeoPortrait } from '../lib/video'
 import CourseCard from '../components/CourseCard'
 import PurchaseBar from '../components/PurchaseBar'
-import {
-  getCourseMeta,
-  discountPct,
-  EXPERT_CREDENTIALS,
-  pseudoRating,
-  maskName,
-} from '../data/mockMarketplace'
+import ReviewSection from '../components/ReviewSection'
+import { Stars } from '../components/Stars'
+import { getCourseMeta, discountPct, EXPERT_CREDENTIALS } from '../data/mockMarketplace'
 
 const NOTICES = [
   '결제 후 강의는 마이페이지 > 내 강의에서 바로 수강할 수 있습니다.',
@@ -35,8 +32,9 @@ const TABS = [
 
 export default function AcademyCourseDetail() {
   const { id } = useParams()
-  const { getCourse, getExpert, getCoursesByExpert, getCourseReviews, loading } = useBizData()
-  const { user } = useAuth()
+  const { getCourse, getExpert, getCoursesByExpert, getCourseReviews, getCourseRating, refetch, loading } =
+    useBizData()
+  const { user, profile } = useAuth()
   const course = getCourse(id ?? '')
   const [enrolled, setEnrolled] = useState(false)
   // 상단 하이라이트 플레이어가 보여줄 레슨 (미리보기 클릭 시 전환)
@@ -87,7 +85,7 @@ export default function AcademyCourseDetail() {
         <h1 className="mt-4 text-2xl font-bold text-slate-900">강의를 찾을 수 없어요</h1>
         <Link
           to="/library"
-          className="mt-6 inline-block rounded-xl bg-violet-600 px-6 py-3 font-semibold text-white"
+          className="mt-6 inline-block rounded-xl bg-zinc-900 px-6 py-3 font-semibold text-white hover:bg-zinc-800"
         >
           강의 목록으로
         </Link>
@@ -97,9 +95,25 @@ export default function AcademyCourseDetail() {
 
   const expert = getExpert(course.expertId)
   const meta = getCourseMeta(course.id)
-  const credentials = EXPERT_CREDENTIALS[course.expertId] ?? []
+  const credentials = expert?.credentials?.length
+    ? expert.credentials
+    : EXPERT_CREDENTIALS[course.expertId] ?? []
   // 공개 화면에서는 전문가가 숨긴 리뷰를 제외
   const reviews = getCourseReviews(course.id).filter((r) => !r.hidden)
+  const { rating: avgRating, count: ratingCount } = getCourseRating(course.id)
+  const myEmail = user?.email ?? ''
+  const alreadyWrote = !!myEmail && reviews.some((r) => r.userEmail === myEmail)
+  const submitReview = (rating: number, content: string) =>
+    addCourseReview({
+      courseId: course.id,
+      userName: profile?.display_name || myEmail || '수강생',
+      userEmail: myEmail,
+      content,
+      rating,
+    }).then((res) => {
+      if (!res.error) refetch()
+      return res
+    })
   const related = getCoursesByExpert(course.expertId).filter((c) => c.id !== course.id)
 
   return (
@@ -126,11 +140,13 @@ export default function AcademyCourseDetail() {
                 </div>
               )}
               <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-500">
-                <span className="font-semibold text-amber-400">
-                  ★ <span className="text-slate-700">{course.rating.toFixed(1)}</span>
-                </span>
-                <span>· 구매 {course.studentCount.toLocaleString()}명</span>
-                <span>· {course.lessonCount}강</span>
+                {ratingCount > 0 && (
+                  <span className="font-semibold text-amber-400">
+                    ★ <span className="text-slate-700">{avgRating.toFixed(1)}</span>
+                    <span className="text-slate-400"> ({ratingCount})</span>
+                  </span>
+                )}
+                <span>{course.lessonCount}강</span>
               </div>
             </div>
           </section>
@@ -174,11 +190,19 @@ export default function AcademyCourseDetail() {
             <div className="mt-6 space-y-4">
               {course.detailBlocks!.map((b) =>
                 b.type === 'heading' ? (
-                  <h3 key={b.id} className="text-lg font-black text-slate-900">
+                  <h3
+                    key={b.id}
+                    className={`${blockClass(b)} ${b.color ? '' : 'text-slate-900'}`}
+                    style={blockStyle(b)}
+                  >
                     {b.value}
                   </h3>
                 ) : b.type === 'text' ? (
-                  <p key={b.id} className="whitespace-pre-line leading-relaxed text-slate-600">
+                  <p
+                    key={b.id}
+                    className={`whitespace-pre-line leading-relaxed ${blockClass(b)} ${b.color ? '' : 'text-slate-600'}`}
+                    style={blockStyle(b)}
+                  >
                     {b.value}
                   </p>
                 ) : b.value ? (
@@ -211,7 +235,7 @@ export default function AcademyCourseDetail() {
                 >
                   <span
                     className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-bold ${
-                      isActive ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'
+                      isActive ? 'bg-zinc-900 text-white' : 'bg-slate-100 text-slate-500'
                     }`}
                   >
                     {i + 1}
@@ -286,39 +310,16 @@ export default function AcademyCourseDetail() {
           </div>
         </section>
 
-        {/* 7. 후기 */}
-        <section id="reviews" className="scroll-mt-32">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-xl font-black text-slate-900">수강생 후기</h2>
-            <span className="text-sm text-slate-500">
-              <span className="font-bold text-amber-400">★</span>{' '}
-              <span className="font-semibold text-slate-700">{course.rating.toFixed(1)}</span> ·{' '}
-              {reviews.length}개
-            </span>
-          </div>
-          {reviews.length === 0 ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white py-14 text-center">
-              <div className="text-4xl">✍️</div>
-              <p className="mt-3 font-semibold text-slate-700">아직 등록된 후기가 없어요</p>
-              <p className="mt-1 text-sm text-slate-500">첫 후기의 주인공이 되어보세요.</p>
-            </div>
-          ) : (
-            <div className="mt-4 space-y-3">
-              {reviews.map((r) => (
-                <div key={r.id} className="rounded-2xl border border-slate-200 bg-white p-5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-slate-800">
-                      {maskName(r.userName)}
-                    </span>
-                    <span className="text-xs text-slate-400">{r.createdAt}</span>
-                  </div>
-                  <div className="mt-1 text-amber-400">{'★'.repeat(pseudoRating(r.id))}</div>
-                  <p className="mt-2 leading-relaxed text-slate-600">{r.content}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        {/* 7. 후기 — 실제 별점+후기 */}
+        <ReviewSection
+          title="수강생 후기"
+          items={reviews}
+          avg={avgRating}
+          count={ratingCount}
+          canWrite={enrolled}
+          alreadyWrote={alreadyWrote}
+          onSubmit={submitReview}
+        />
 
         {/* 9. 주의사항 */}
         <section className="scroll-mt-32">
@@ -378,9 +379,11 @@ function PurchaseCard({
 }) {
   const { user } = useAuth()
   const { isWished, toggle } = useWishlist()
+  const { getCourseRating } = useBizData()
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
 
+  const { rating: avgRating, count: ratingCount } = getCourseRating(course.id)
   const meta = getCourseMeta(course.id)
   const originalPrice = course.originalPrice ?? meta.originalPrice
   const off = discountPct(course.price, originalPrice)
@@ -441,12 +444,13 @@ function PurchaseCard({
       </div>
 
       <h1 className="mt-3 text-lg font-black leading-snug text-slate-900">{course.title}</h1>
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-        <span className="font-semibold text-amber-400">
-          ★ <span className="text-slate-700">{course.rating.toFixed(1)}</span>
-        </span>
-        <span>· 구매 {course.studentCount.toLocaleString()}명</span>
-      </div>
+      {ratingCount > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+          <Stars n={avgRating} />
+          <span className="font-semibold text-slate-700">{avgRating.toFixed(1)}</span>
+          <span className="text-slate-400">({ratingCount})</span>
+        </div>
+      )}
 
       <div className="mt-4 flex items-end gap-2">
         {off && (
@@ -467,7 +471,7 @@ function PurchaseCard({
       <button
         onClick={onPrimary}
         disabled={busy}
-        className="mt-5 w-full rounded-xl bg-gradient-to-r from-violet-600 to-purple-500 py-3 font-bold text-white hover:opacity-90 disabled:opacity-50"
+        className="mt-5 w-full rounded-xl bg-zinc-900 py-3 font-bold text-white hover:bg-zinc-800 disabled:opacity-50"
       >
         {enrolled ? '이어보기' : isPaid ? '구매하기' : busy ? '등록 중…' : '무료로 시청하기'}
       </button>

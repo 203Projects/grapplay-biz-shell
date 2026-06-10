@@ -1,19 +1,12 @@
 import { useParams, Link } from 'react-router-dom'
 import { useBizData } from '../lib/useBizData'
 import CourseCard from '../components/CourseCard'
-
-function Stars({ n }: { n: number }) {
-  return (
-    <span className="text-amber-400">
-      {'★'.repeat(n)}
-      <span className="text-stone-300">{'★'.repeat(5 - n)}</span>
-    </span>
-  )
-}
+import EbookCard from '../components/EbookCard'
+import ExpertAvatar from '../components/ExpertAvatar'
 
 export default function AcademyExpertReviews() {
   const { expertId } = useParams()
-  const { getExpert, getExpertReviews, getExpertStats, getCoursesByExpert, loading } = useBizData()
+  const { getExpert, getExpertStats, getCoursesByExpert, getEbooksByExpert, loading } = useBizData()
   const expert = getExpert(expertId ?? '')
 
   if (loading) {
@@ -40,8 +33,13 @@ export default function AcademyExpertReviews() {
   }
 
   const stats = getExpertStats(expert.id)
-  const reviews = getExpertReviews(expert.id)
   const courses = getCoursesByExpert(expert.id)
+  const ebooks = getEbooksByExpert(expert.id)
+  const categories = expert.categories?.length
+    ? expert.categories
+    : expert.category
+      ? [expert.category]
+      : stats.categories
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
@@ -51,64 +49,77 @@ export default function AcademyExpertReviews() {
 
       {/* 프로필 */}
       <div className="mt-4 flex flex-col items-start gap-5 rounded-3xl border border-stone-200 bg-white p-6 sm:flex-row sm:items-center">
-        <div className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-amber-100 text-5xl">
-          {expert.avatar}
-        </div>
+        <ExpertAvatar emoji={expert.avatar} src={expert.avatarUrl} size={80} />
         <div className="flex-1">
           <h1 className="text-2xl font-black text-stone-900">{expert.name}</h1>
           <p className="font-medium text-amber-600">{expert.title}</p>
           <p className="mt-2 text-sm leading-relaxed text-stone-500">{expert.bio}</p>
+          {categories.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {categories.map((c) => (
+                <span
+                  key={c}
+                  className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-600"
+                >
+                  {c}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex gap-6 text-center">
           <div>
-            <div className="text-2xl font-black text-stone-900">{stats.rating.toFixed(1)}</div>
-            <div className="text-xs text-stone-500">평균 평점</div>
-          </div>
-          <div>
-            <div className="text-2xl font-black text-stone-900">{stats.reviewCount}</div>
-            <div className="text-xs text-stone-500">리뷰</div>
-          </div>
-          <div>
-            <div className="text-2xl font-black text-stone-900">{stats.courseCount}</div>
+            <div className="text-2xl font-black text-stone-900">{courses.length}</div>
             <div className="text-xs text-stone-500">강의</div>
           </div>
+          <div>
+            <div className="text-2xl font-black text-stone-900">{ebooks.length}</div>
+            <div className="text-xs text-stone-500">전자책</div>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-stone-900">
+              {stats.studentCount.toLocaleString()}
+            </div>
+            <div className="text-xs text-stone-500">수강생</div>
+          </div>
         </div>
       </div>
+
+      {/* 약력 (있을 때) */}
+      {expert.credentials && expert.credentials.length > 0 && (
+        <ul className="mt-6 grid gap-2 rounded-2xl border border-stone-200 bg-white p-5 sm:grid-cols-2">
+          {expert.credentials.map((c) => (
+            <li key={c} className="flex items-center gap-2 text-sm text-stone-600">
+              <span className="text-violet-500">✓</span> {c}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {/* 전문가 강의 */}
-      <h2 className="mt-10 text-xl font-black text-stone-900">강의</h2>
-      <div className="mt-4 grid gap-5 sm:grid-cols-2">
-        {courses.map((c) => (
-          <CourseCard key={c.id} course={c} />
-        ))}
-      </div>
-
-      {/* 리뷰 */}
-      <h2 className="mt-10 text-xl font-black text-stone-900">수강생 리뷰 ({reviews.length})</h2>
-      {reviews.length === 0 ? (
-        <div className="mt-4 rounded-2xl border border-dashed border-stone-300 bg-white py-16 text-center">
-          <div className="text-4xl">✍️</div>
-          <p className="mt-3 font-semibold text-stone-700">아직 등록된 리뷰가 없어요</p>
-          <p className="mt-1 text-sm text-stone-500">첫 리뷰의 주인공이 되어보세요.</p>
+      <h2 className="mt-10 text-xl font-black text-stone-900">강의 ({courses.length})</h2>
+      {courses.length === 0 ? (
+        <div className="mt-4 rounded-2xl border border-dashed border-stone-300 bg-white py-12 text-center text-sm text-stone-500">
+          아직 등록된 강의가 없어요.
         </div>
       ) : (
-        <div className="mt-4 space-y-3">
-          {reviews.map((r) => (
-            <div key={r.id} className="rounded-2xl border border-stone-200 bg-white p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-stone-100 text-sm">
-                    🙂
-                  </span>
-                  <span className="text-sm font-semibold text-stone-800">{r.userName}</span>
-                </div>
-                <span className="text-xs text-stone-400">{r.createdAt}</span>
-              </div>
-              <div className="mt-2 text-sm">
-                <Stars n={r.rating} />
-              </div>
-              <p className="mt-2 leading-relaxed text-stone-600">{r.content}</p>
-            </div>
+        <div className="mt-4 grid gap-5 sm:grid-cols-2">
+          {courses.map((c) => (
+            <CourseCard key={c.id} course={c} />
+          ))}
+        </div>
+      )}
+
+      {/* 전문가 전자책 */}
+      <h2 className="mt-10 text-xl font-black text-stone-900">전자책 ({ebooks.length})</h2>
+      {ebooks.length === 0 ? (
+        <div className="mt-4 rounded-2xl border border-dashed border-stone-300 bg-white py-12 text-center text-sm text-stone-500">
+          아직 등록된 전자책이 없어요.
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-5 sm:grid-cols-2">
+          {ebooks.map((e) => (
+            <EbookCard key={e.id} ebook={e} />
           ))}
         </div>
       )}

@@ -2,17 +2,39 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CATEGORIES, Category } from '../data/mock'
 import { useBizData } from '../lib/useBizData'
+import { useAuth } from '../lib/auth'
+import ExpertAvatar from '../components/ExpertAvatar'
 
-type Filter = '전체' | Category
+// 전문가가 가진 전문 분야 모음 — 다중 categories 우선, 없으면 단일 category, 그래도 없으면 강의 기반.
+function expertCategories(
+  e: { category?: Category; categories?: Category[] },
+  courseCats: Category[],
+): Category[] {
+  if (e.categories?.length) return e.categories
+  if (e.category) return [e.category]
+  return courseCats
+}
 
 export default function AcademyExperts() {
-  const { experts, getExpertStats } = useBizData()
-  const [filter, setFilter] = useState<Filter>('전체')
+  const { experts, getExpertStats, getEbooksByExpert } = useBizData()
+  const { profile } = useAuth()
+  // 전문가(승인된 지도자) 또는 관리자만 대시보드로, 그 외에는 문의하기로 유도
+  const isExpert =
+    (profile?.role === 'expert' && !!profile.expert_id) || profile?.role === 'admin'
+  // 다중 선택 필터 — 비어 있으면 전체
+  const [selected, setSelected] = useState<Set<Category>>(new Set())
+
+  const toggle = (c: Category) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(c) ? next.delete(c) : next.add(c)
+      return next
+    })
 
   const list = experts.filter((e) => {
-    if (filter === '전체') return true
-    // 관리자가 지정한 전문 분야 우선, 없으면 강의 기반 카테고리로 폴백
-    return e.category === filter || getExpertStats(e.id).categories.includes(filter)
+    if (selected.size === 0) return true
+    const cats = expertCategories(e, getExpertStats(e.id).categories)
+    return cats.some((c) => selected.has(c))
   })
 
   return (
@@ -20,27 +42,43 @@ export default function AcademyExperts() {
       <h1 className="text-3xl font-black text-stone-900">전문가</h1>
       <p className="mt-2 text-stone-500">현장에서 검증된 체육관 비즈니스 전문가를 만나보세요</p>
 
-      {/* 카테고리 필터 */}
+      {/* 카테고리 다중 선택 필터 — 여러 분야를 동시에 고를 수 있어요 */}
       <div className="mt-6 flex flex-wrap gap-2">
-        {(['전체', ...CATEGORIES.map((c) => c.key)] as Filter[]).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-              filter === f
-                ? 'bg-stone-900 text-white'
-                : 'border border-stone-300 bg-white text-stone-600 hover:bg-stone-100'
-            }`}
-          >
-            {f}
-          </button>
-        ))}
+        <button
+          onClick={() => setSelected(new Set())}
+          className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+            selected.size === 0
+              ? 'bg-stone-900 text-white'
+              : 'border border-stone-300 bg-white text-stone-600 hover:bg-stone-100'
+          }`}
+        >
+          전체
+        </button>
+        {CATEGORIES.map((c) => {
+          const on = selected.has(c.key)
+          return (
+            <button
+              key={c.key}
+              onClick={() => toggle(c.key)}
+              aria-pressed={on}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                on
+                  ? 'bg-stone-900 text-white'
+                  : 'border border-stone-300 bg-white text-stone-600 hover:bg-stone-100'
+              }`}
+            >
+              {on ? '✓ ' : ''}
+              {c.key}
+            </button>
+          )
+        })}
       </div>
 
       {/* 전문가 카드 그리드 */}
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {list.map((e) => {
           const s = getExpertStats(e.id)
+          const ebookCount = getEbooksByExpert(e.id).length
           return (
             <Link
               key={e.id}
@@ -48,9 +86,7 @@ export default function AcademyExperts() {
               className="group flex flex-col rounded-2xl border border-stone-200 bg-white p-6 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-stone-200/60"
             >
               <div className="flex items-center gap-4">
-                <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-amber-100 text-4xl">
-                  {e.avatar}
-                </div>
+                <ExpertAvatar emoji={e.avatar} src={e.avatarUrl} size={64} />
                 <div>
                   <h3 className="text-lg font-bold text-stone-900 group-hover:text-amber-700">
                     {e.name}
@@ -62,7 +98,7 @@ export default function AcademyExperts() {
               <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-stone-500">{e.bio}</p>
 
               <div className="mt-4 flex flex-wrap gap-1.5">
-                {s.categories.map((c) => (
+                {expertCategories(e, s.categories).map((c) => (
                   <span
                     key={c}
                     className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-600"
@@ -73,10 +109,9 @@ export default function AcademyExperts() {
               </div>
 
               <div className="mt-5 flex items-center gap-4 border-t border-stone-100 pt-4 text-sm text-stone-500">
-                <span className="font-semibold text-stone-700">⭐ {s.rating.toFixed(1)}</span>
-                <span>리뷰 {s.reviewCount}</span>
                 <span>강의 {s.courseCount}</span>
-                <span className="ml-auto text-amber-600 group-hover:underline">리뷰 보기 →</span>
+                <span>전자책 {ebookCount}</span>
+                <span className="ml-auto text-amber-600 group-hover:underline">보러가기 →</span>
               </div>
             </Link>
           )
@@ -88,14 +123,16 @@ export default function AcademyExperts() {
         <div>
           <h2 className="text-xl font-black">체육관 비즈니스 전문가이신가요?</h2>
           <p className="mt-1 text-sm text-stone-300">
-            강의를 올리고 수익을 관리하는 전문가 대시보드로 이동하세요.
+            {isExpert
+              ? '강의를 올리고 수익을 관리하는 전문가 대시보드로 이동하세요.'
+              : '전문가로 활동하고 싶다면 문의해 주세요. 검토 후 등록을 도와드릴게요.'}
           </p>
         </div>
         <Link
-          to="/expert/dashboard"
+          to={isExpert ? '/expert/dashboard' : '/contact'}
           className="shrink-0 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-6 py-3 font-bold text-stone-900 hover:opacity-90"
         >
-          전문가 대시보드 →
+          {isExpert ? '전문가 대시보드 →' : '문의하기 →'}
         </Link>
       </div>
     </div>

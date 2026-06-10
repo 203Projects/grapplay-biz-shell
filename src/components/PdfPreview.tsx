@@ -1,11 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import * as pdfjsLib from 'pdfjs-dist'
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import { drawWatermark } from '../lib/pdfWatermark'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
 
-// PDF의 앞 maxPages 페이지만 canvas로 렌더링 (미리보기 제한)
-export default function PdfPreview({ url, maxPages }: { url: string; maxPages: number }) {
+// PDF의 앞 maxPages 페이지만 canvas로 렌더링 (미리보기 제한) + 선택 워터마크
+export default function PdfPreview({
+  url,
+  maxPages,
+  watermark,
+}: {
+  url: string
+  maxPages: number
+  watermark?: string
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -35,6 +44,8 @@ export default function PdfPreview({ url, maxPages }: { url: string; maxPages: n
           if (!ctx) continue
           container.appendChild(canvas)
           await page.render({ canvas, canvasContext: ctx, viewport }).promise
+          if (cancelled) return
+          if (watermark) drawWatermark(ctx, canvas.width, canvas.height, watermark)
         }
         if (!cancelled) setLoading(false)
       })
@@ -49,7 +60,7 @@ export default function PdfPreview({ url, maxPages }: { url: string; maxPages: n
       cancelled = true
       task.destroy()
     }
-  }, [url, maxPages])
+  }, [url, maxPages, watermark])
 
   return (
     <div className="bg-slate-50 p-4">

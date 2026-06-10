@@ -21,6 +21,39 @@ export interface CourseInput {
   rewardPdfUrl?: string | null
 }
 
+// 전문가 본인 공개 프로필(제목/소개/사진/분야) 수정 — 마이페이지에서 사용.
+// RLS의 "expert updates own row"(owns_expert)가 본인 experts 행만 허용.
+export interface MyExpertInput {
+  title?: string
+  bio?: string
+  avatar?: string
+  avatarUrl?: string | null
+  categories?: Category[]
+  credentials?: string[]
+}
+
+export async function updateMyExpert(expertId: string, patch: MyExpertInput) {
+  if (!supabase) return { error: '연결이 설정되지 않았습니다.' }
+  const row: Record<string, unknown> = {}
+  if (patch.title !== undefined) row.title = patch.title
+  if (patch.bio !== undefined) row.bio = patch.bio
+  if (patch.avatar !== undefined) row.avatar = patch.avatar || '🧑‍🏫'
+  if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl
+  if (patch.categories !== undefined) {
+    row.categories = patch.categories
+    row.category = patch.categories[0] ?? null
+  }
+  if (patch.credentials !== undefined) row.credentials = patch.credentials
+  const { data, error } = await supabase
+    .from('experts')
+    .update(row)
+    .eq('id', expertId)
+    .select('id')
+  if (error) return { error: error.message }
+  if (!data || data.length === 0) return { error: '권한이 없거나 전문가 정보를 찾을 수 없습니다.' }
+  return { error: null }
+}
+
 const DEFAULT_COVERS = [
   'from-amber-400 to-orange-500',
   'from-emerald-400 to-teal-500',
@@ -94,6 +127,44 @@ export async function setReviewHidden(reviewId: string, hidden: boolean) {
   const { data, error } = await supabase
     .from('course_reviews')
     .update({ hidden })
+    .eq('id', reviewId)
+    .select('id')
+  if (error) return { error: error.message }
+  if (!data || data.length === 0) return { error: '권한이 없거나 리뷰를 찾을 수 없습니다.' }
+  return { error: null }
+}
+
+// 전자책 리뷰 숨김/해제 (소유 전문가 또는 관리자)
+export async function setEbookReviewHidden(reviewId: string, hidden: boolean) {
+  if (!supabase) return { error: '연결이 설정되지 않았습니다.' }
+  const { data, error } = await supabase
+    .from('ebook_reviews')
+    .update({ hidden })
+    .eq('id', reviewId)
+    .select('id')
+  if (error) return { error: error.message }
+  if (!data || data.length === 0) return { error: '권한이 없거나 리뷰를 찾을 수 없습니다.' }
+  return { error: null }
+}
+
+// 리뷰 삭제 (관리자) — RLS admin delete 정책으로 보호
+export async function deleteCourseReview(reviewId: string) {
+  if (!supabase) return { error: '연결이 설정되지 않았습니다.' }
+  const { data, error } = await supabase
+    .from('course_reviews')
+    .delete()
+    .eq('id', reviewId)
+    .select('id')
+  if (error) return { error: error.message }
+  if (!data || data.length === 0) return { error: '권한이 없거나 리뷰를 찾을 수 없습니다.' }
+  return { error: null }
+}
+
+export async function deleteEbookReview(reviewId: string) {
+  if (!supabase) return { error: '연결이 설정되지 않았습니다.' }
+  const { data, error } = await supabase
+    .from('ebook_reviews')
+    .delete()
     .eq('id', reviewId)
     .select('id')
   if (error) return { error: error.message }
@@ -190,12 +261,14 @@ export async function deleteEbook(id: string) {
 export interface ExpertRevenue {
   total: number
   count: number
+  students: number // 실제 수강생 수 (결제 완료 강의 주문의 고유 구매자)
+  studentsByCourse: Record<string, number> // 강의별 고유 구매자 수
   byMonth: { month: string; amount: number }[]
 }
 
 // 소유 강의의 결제 완료(paid) 주문 합계 — orders RLS가 전문가 본인 강의만 노출
 export async function getExpertRevenue(expertId: string): Promise<ExpertRevenue> {
-  const empty: ExpertRevenue = { total: 0, count: 0, byMonth: [] }
+  const empty: ExpertRevenue = { total: 0, count: 0, students: 0, studentsByCourse: {}, byMonth: [] }
   if (!supabase) return empty
 
   const { data: courses } = await supabase
@@ -207,13 +280,22 @@ export async function getExpertRevenue(expertId: string): Promise<ExpertRevenue>
 
   const { data: orders, error } = await supabase
     .from('orders')
-    .select('amount, paid_at, created_at')
+    .select('amount, paid_at, created_at, user_id, item_id')
     .eq('status', 'paid')
     .eq('item_type', 'course')
     .in('item_id', ids)
   if (error || !orders) return empty
 
   const total = orders.reduce((s: number, o: any) => s + (o.amount ?? 0), 0)
+  // 고유 구매자 수 = 실제 수강생 수 (한 사람이 여러 강의를 사도 1명으로 집계)
+  const students = new Set(orders.map((o: any) => o.user_id)).size
+  // 강의별 고유 구매자 수
+  const buyersByCourse: Record<string, Set<string>> = {}
+  for (const o of orders as any[]) {
+    ;(buyersByCourse[o.item_id] ??= new Set()).add(o.user_id)
+  }
+  const studentsByCourse: Record<string, number> = {}
+  for (const [cid, set] of Object.entries(buyersByCourse)) studentsByCourse[cid] = set.size
 
   // 최근 6개월 집계
   const now = new Date()
@@ -232,6 +314,8 @@ export async function getExpertRevenue(expertId: string): Promise<ExpertRevenue>
   return {
     total,
     count: orders.length,
+    students,
+    studentsByCourse,
     byMonth: months.map(({ month, amount }) => ({ month, amount })),
   }
 }

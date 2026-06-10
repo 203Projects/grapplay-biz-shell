@@ -132,25 +132,39 @@ export interface ExpertInput {
   name: string
   title: string
   avatar?: string
+  avatarUrl?: string | null
   bio?: string
   category?: Category
+  categories?: Category[]
+  credentials?: string[]
 }
 
 function genExpertId() {
   return `e_${crypto.randomUUID().slice(0, 8)}`
 }
 
-export async function createExpert(input: ExpertInput) {
-  if (!supabase) return { data: null, error: '연결이 설정되지 않았습니다.' }
-  const row = {
-    id: genExpertId(),
+function expertRow(input: ExpertInput) {
+  const cats = input.categories ?? (input.category ? [input.category] : [])
+  return {
     name: input.name,
     title: input.title,
     avatar: input.avatar || '🧑‍🏫',
+    avatar_url: input.avatarUrl ?? null,
     bio: input.bio ?? '',
-    category: input.category ?? null,
+    // 단일 category는 하위호환을 위해 다중의 첫 값으로 유지
+    category: cats[0] ?? null,
+    categories: cats,
+    credentials: input.credentials ?? [],
   }
-  const { data, error } = await supabase.from('experts').insert(row).select().single()
+}
+
+export async function createExpert(input: ExpertInput) {
+  if (!supabase) return { data: null, error: '연결이 설정되지 않았습니다.' }
+  const { data, error } = await supabase
+    .from('experts')
+    .insert({ id: genExpertId(), ...expertRow(input) })
+    .select()
+    .single()
   return { data, error: error?.message ?? null }
 }
 
@@ -158,17 +172,94 @@ export async function updateExpert(id: string, patch: ExpertInput) {
   if (!supabase) return { data: null, error: '연결이 설정되지 않았습니다.' }
   const { data, error } = await supabase
     .from('experts')
-    .update({
-      name: patch.name,
-      title: patch.title,
-      avatar: patch.avatar || '🧑‍🏫',
-      bio: patch.bio ?? '',
-      category: patch.category ?? null,
-    })
+    .update(expertRow(patch))
     .eq('id', id)
     .select()
     .single()
   return { data, error: error?.message ?? null }
+}
+
+export async function deleteExpert(id: string) {
+  if (!supabase) return { error: '연결이 설정되지 않았습니다.' }
+  const { error } = await supabase.from('experts').delete().eq('id', id)
+  if (error) {
+    // FK 위반 — 연결된 강의/전자책이 있으면 삭제 불가
+    if (error.code === '23503' || /foreign key|violates/i.test(error.message)) {
+      return { error: '이 전문가에게 연결된 강의·전자책이 있어 삭제할 수 없어요. 먼저 콘텐츠를 옮기거나 삭제하세요.' }
+    }
+    return { error: error.message }
+  }
+  return { error: null }
+}
+
+// ── 배너 관리 (요청 ②③) ──
+export interface BannerInput {
+  title: string
+  subtitle?: string
+  gradient: string
+  cta?: string
+  link?: string
+  sort_order?: number
+  active?: boolean
+}
+export interface AdminBanner {
+  id: string
+  title: string
+  subtitle: string | null
+  gradient: string
+  cta: string | null
+  link: string | null
+  sort_order: number
+  active: boolean
+}
+
+export async function listBanners(): Promise<AdminBanner[]> {
+  if (!supabase) return []
+  const { data } = await supabase
+    .from('banners')
+    .select('id, title, subtitle, gradient, cta, link, sort_order, active')
+    .order('sort_order', { ascending: true })
+  return (data as AdminBanner[]) ?? []
+}
+
+export async function createBanner(input: BannerInput) {
+  if (!supabase) return { error: '연결이 설정되지 않았습니다.' }
+  const { error } = await supabase.from('banners').insert({
+    title: input.title,
+    subtitle: input.subtitle ?? null,
+    gradient: input.gradient,
+    cta: input.cta ?? null,
+    link: input.link ?? null,
+    sort_order: input.sort_order ?? 0,
+    active: input.active ?? true,
+  })
+  return { error: error?.message ?? null }
+}
+
+export async function updateBanner(id: string, patch: BannerInput) {
+  if (!supabase) return { error: '연결이 설정되지 않았습니다.' }
+  const { data, error } = await supabase
+    .from('banners')
+    .update({
+      title: patch.title,
+      subtitle: patch.subtitle ?? null,
+      gradient: patch.gradient,
+      cta: patch.cta ?? null,
+      link: patch.link ?? null,
+      sort_order: patch.sort_order ?? 0,
+      active: patch.active ?? true,
+    })
+    .eq('id', id)
+    .select('id')
+  if (error) return { error: error.message }
+  if (!data || data.length === 0) return { error: '권한이 없거나 배너를 찾을 수 없습니다.' }
+  return { error: null }
+}
+
+export async function deleteBanner(id: string) {
+  if (!supabase) return { error: '연결이 설정되지 않았습니다.' }
+  const { error } = await supabase.from('banners').delete().eq('id', id)
+  return { error: error?.message ?? null }
 }
 
 // ── 주문 관리 ──

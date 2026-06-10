@@ -2,9 +2,14 @@ import { Link } from 'react-router-dom'
 import { formatPrice } from '../data/mock'
 import { Ebook, ebookDiscountPct } from '../data/mockEbooks'
 import { useWishlist } from '../lib/wishlist'
+import { useBizData } from '../lib/useBizData'
+import ExpertAvatar from './ExpertAvatar'
 
 export default function EbookCard({ ebook }: { ebook: Ebook }) {
   const { isWished, toggle } = useWishlist()
+  const { getExpert, getEbookRating } = useBizData()
+  const expert = ebook.expertId ? getExpert(ebook.expertId) : undefined
+  const { rating: avgRating, count: ratingCount } = getEbookRating(ebook.id)
   const wished = isWished('ebook', ebook.id)
   const isPaid = ebook.price > 0
   const off = ebookDiscountPct(ebook.price, ebook.originalPrice)
@@ -51,12 +56,18 @@ export default function EbookCard({ ebook }: { ebook: Ebook }) {
         <h3 className="line-clamp-2 font-bold leading-snug text-slate-900 group-hover:text-violet-700">
           {ebook.title}
         </h3>
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-slate-400">
-          <span>
-            {ebook.avatar} {ebook.author}
-          </span>
-          <span>· ★ {ebook.rating.toFixed(1)}</span>
-          <span>· {ebook.pageCount}p</span>
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+          <ExpertAvatar emoji={expert?.avatar ?? ebook.avatar} src={expert?.avatarUrl} size={18} />
+          <span className="truncate">{ebook.author}</span>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-slate-400">
+          {ratingCount > 0 && (
+            <span className="font-semibold text-amber-400">
+              ★ <span className="text-slate-600">{avgRating.toFixed(1)}</span>
+              <span className="text-slate-400"> ({ratingCount})</span>
+            </span>
+          )}
+          <span>{ebook.pageCount}p</span>
         </div>
 
         <div className="mt-auto flex items-end justify-between pt-4">

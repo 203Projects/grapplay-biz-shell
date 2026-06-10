@@ -120,7 +120,7 @@ export default function Checkout() {
       <button
         onClick={onPay}
         disabled={paying}
-        className="mt-6 w-full rounded-xl bg-gradient-to-r from-violet-600 to-purple-500 py-4 text-lg font-bold text-white hover:opacity-90 disabled:opacity-50"
+        className="mt-6 w-full rounded-xl bg-zinc-900 py-4 text-lg font-bold text-white hover:bg-zinc-800 disabled:opacity-50"
       >
         {paying ? '결제 진행 중…' : `${formatPrice(price)} 결제하기`}
       </button>

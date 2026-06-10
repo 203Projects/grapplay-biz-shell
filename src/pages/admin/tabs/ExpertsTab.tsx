@@ -1,12 +1,24 @@
 import { useState } from 'react'
 import { useBizData } from '../../../lib/useBizData'
-import { createExpert, updateExpert, type ExpertInput } from '../../../lib/adminApi'
+import { createExpert, updateExpert, deleteExpert, type ExpertInput } from '../../../lib/adminApi'
 import { CATEGORIES, type Category, type Expert } from '../../../data/mock'
+import { uploadToCovers } from '../../../lib/storage'
+import ExpertAvatar from '../../../components/ExpertAvatar'
 
 // 전문가 관리 — 전문가 레코드 생성/수정 (회원을 전문가로 승격하기 전 단계)
 export default function ExpertsTab() {
   const { experts, refetch, loading } = useBizData()
   const [editing, setEditing] = useState<Expert | 'new' | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const onDelete = async (e: Expert) => {
+    if (!confirm(`전문가 "${e.name}"을(를) 삭제할까요? 되돌릴 수 없습니다.`)) return
+    setDeletingId(e.id)
+    const { error } = await deleteExpert(e.id)
+    setDeletingId(null)
+    if (error) return alert('삭제 실패: ' + error)
+    refetch()
+  }
 
   if (loading) {
     return <div className="h-40 animate-pulse rounded-2xl bg-stone-100" />
@@ -21,7 +33,7 @@ export default function ExpertsTab() {
         </p>
         <button
           onClick={() => setEditing('new')}
-          className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700"
+          className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-bold text-white hover:bg-zinc-800"
         >
           + 새 전문가
         </button>
@@ -44,17 +56,18 @@ export default function ExpertsTab() {
             key={e.id}
             className="flex items-center gap-4 rounded-2xl border border-stone-200 bg-white p-4"
           >
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-violet-100 text-2xl">
-              {e.avatar}
-            </div>
+            <ExpertAvatar emoji={e.avatar} src={e.avatarUrl} size={48} />
             <div className="flex-1">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-bold text-stone-900">{e.name}</h3>
-                {e.category && (
-                  <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-700">
-                    {e.category}
+                {(e.categories?.length ? e.categories : e.category ? [e.category] : []).map((c) => (
+                  <span
+                    key={c}
+                    className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-700"
+                  >
+                    {c}
                   </span>
-                )}
+                ))}
               </div>
               <p className="text-xs text-stone-500">{e.title}</p>
               <p className="font-mono text-[11px] text-stone-400">{e.id}</p>
@@ -64,6 +77,13 @@ export default function ExpertsTab() {
               className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50"
             >
               편집
+            </button>
+            <button
+              onClick={() => onDelete(e)}
+              disabled={deletingId === e.id}
+              className="rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+            >
+              {deletingId === e.id ? '삭제 중…' : '삭제'}
             </button>
           </div>
         ))}
@@ -89,17 +109,41 @@ function ExpertForm({
   const [name, setName] = useState(expert?.name ?? '')
   const [title, setTitle] = useState(expert?.title ?? '')
   const [avatar, setAvatar] = useState(expert?.avatar ?? '🧑‍🏫')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(expert?.avatarUrl ?? null)
   const [bio, setBio] = useState(expert?.bio ?? '')
-  const [category, setCategory] = useState<Category | undefined>(expert?.category)
+  const [categories, setCategories] = useState<Category[]>(
+    expert?.categories?.length ? expert.categories : expert?.category ? [expert.category] : [],
+  )
+  const [credentials, setCredentials] = useState<string[]>(expert?.credentials ?? [])
   const [busy, setBusy] = useState(false)
+  const [uploading, setUploading] = useState(false)
+
+  const toggleCat = (c: Category) =>
+    setCategories((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]))
+  const setCred = (i: number, v: string) =>
+    setCredentials((prev) => prev.map((x, idx) => (idx === i ? v : x)))
+
+  const onUploadPhoto = async (file: File) => {
+    setUploading(true)
+    const { url, error } = await uploadToCovers(file, 'avatars')
+    setUploading(false)
+    if (error || !url) return alert('사진 업로드 실패: ' + (error ?? '알 수 없는 오류'))
+    setAvatarUrl(url)
+  }
 
   const save = async () => {
     if (!name.trim() || !title.trim()) return alert('이름과 직함을 입력하세요.')
     setBusy(true)
-    const input: ExpertInput = { name: name.trim(), title: title.trim(), avatar, bio: bio.trim(), category }
-    const { error } = expert
-      ? await updateExpert(expert.id, input)
-      : await createExpert(input)
+    const input: ExpertInput = {
+      name: name.trim(),
+      title: title.trim(),
+      avatar,
+      avatarUrl,
+      bio: bio.trim(),
+      categories,
+      credentials: credentials.map((c) => c.trim()).filter(Boolean),
+    }
+    const { error } = expert ? await updateExpert(expert.id, input) : await createExpert(input)
     setBusy(false)
     if (error) return alert('저장 실패: ' + error)
     onSaved()
@@ -114,32 +158,100 @@ function ExpertForm({
         <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="이름" />
         <input className={input} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="직함 (예: 주짓수 블랙벨트)" />
       </div>
-      <input className={input} value={avatar} onChange={(e) => setAvatar(e.target.value)} placeholder="아바타 이모지 (예: 🥋)" />
+
+      {/* 프로필 사진 (업로드) + 이모지 폴백 */}
+      <div className="flex items-center gap-4 rounded-xl border border-stone-200 bg-white p-3">
+        <ExpertAvatar emoji={avatar} src={avatarUrl} size={56} />
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <label className="cursor-pointer rounded-lg bg-stone-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-stone-800">
+              {uploading ? '업로드 중…' : '사진 업로드'}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && onUploadPhoto(e.target.files[0])}
+              />
+            </label>
+            {avatarUrl && (
+              <button
+                type="button"
+                onClick={() => setAvatarUrl(null)}
+                className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-50"
+              >
+                사진 제거
+              </button>
+            )}
+          </div>
+          <input
+            className="w-full rounded-lg border border-stone-300 px-3 py-1.5 text-sm outline-none focus:border-violet-400"
+            value={avatar}
+            onChange={(e) => setAvatar(e.target.value)}
+            placeholder="아바타 이모지 (사진 없을 때 폴백, 예: 🥋)"
+          />
+        </div>
+      </div>
+
       <div>
-        <div className="mb-1.5 text-xs font-medium text-stone-500">전문 분야 (카테고리)</div>
+        <div className="mb-1.5 text-xs font-medium text-stone-500">전문 분야 (여러 개 선택 가능)</div>
         <div className="flex flex-wrap gap-2">
           {CATEGORIES.map((c) => (
             <button
               key={c.key}
               type="button"
-              onClick={() => setCategory(category === c.key ? undefined : c.key)}
+              onClick={() => toggleCat(c.key)}
               className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
-                category === c.key
+                categories.includes(c.key)
                   ? 'border-stone-900 bg-stone-900 text-white'
                   : 'border-stone-300 bg-white text-stone-600 hover:bg-stone-100'
               }`}
             >
+              {categories.includes(c.key) ? '✓ ' : ''}
               {c.emoji} {c.key}
             </button>
           ))}
         </div>
       </div>
       <textarea className={input} rows={3} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="소개" />
+
+      {/* 약력 (강사소개 ✓ 불릿) */}
+      <div>
+        <div className="mb-1.5 text-xs font-medium text-stone-500">약력 (강사소개 ✓ 항목)</div>
+        <div className="space-y-2">
+          {credentials.map((c, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-violet-500">✓</span>
+              <input
+                className={input}
+                value={c}
+                onChange={(e) => setCred(i, e.target.value)}
+                placeholder="예: 체육관 경영 컨설팅 15년"
+              />
+              <button
+                type="button"
+                onClick={() => setCredentials((prev) => prev.filter((_, idx) => idx !== i))}
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-stone-300 text-stone-500 hover:bg-stone-100"
+                aria-label="삭제"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setCredentials((prev) => [...prev, ''])}
+            className="rounded-lg border border-dashed border-stone-300 px-3 py-1.5 text-sm font-semibold text-stone-500 hover:border-violet-300 hover:text-violet-600"
+          >
+            + 약력 추가
+          </button>
+        </div>
+      </div>
+
       <div className="flex gap-2">
         <button
           onClick={save}
           disabled={busy}
-          className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
         >
           저장
         </button>

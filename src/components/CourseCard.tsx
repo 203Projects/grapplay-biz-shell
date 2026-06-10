@@ -2,9 +2,14 @@ import { Link } from 'react-router-dom'
 import { Course, formatPrice } from '../data/mock'
 import { getCourseMeta, discountPct } from '../data/mockMarketplace'
 import { useWishlist } from '../lib/wishlist'
+import { useBizData } from '../lib/useBizData'
+import ExpertAvatar from './ExpertAvatar'
 
 export default function CourseCard({ course }: { course: Course }) {
   const { isWished, toggle } = useWishlist()
+  const { getExpert, getCourseRating } = useBizData()
+  const expert = getExpert(course.expertId)
+  const { rating: avgRating, count: ratingCount } = getCourseRating(course.id)
   const wished = isWished('course', course.id)
   const isPaid = course.price > 0
   const meta = getCourseMeta(course.id)
@@ -58,12 +63,22 @@ export default function CourseCard({ course }: { course: Course }) {
           {course.title}
         </h3>
 
+        {/* 작성자(전문가) — 전자책 카드와 통일 */}
+        {expert && (
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+            <ExpertAvatar emoji={expert.avatar} src={expert.avatarUrl} size={18} />
+            <span className="truncate">{expert.name}</span>
+          </div>
+        )}
+
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400">
-          <span className="font-semibold text-amber-400">
-            ★ <span className="text-slate-600">{course.rating.toFixed(1)}</span>
-          </span>
-          <span>· 구매 {course.studentCount.toLocaleString()}명</span>
-          <span>· {course.lessonCount}강</span>
+          {ratingCount > 0 && (
+            <span className="font-semibold text-amber-400">
+              ★ <span className="text-slate-600">{avgRating.toFixed(1)}</span>
+              <span className="text-slate-400"> ({ratingCount})</span>
+            </span>
+          )}
+          <span>{course.lessonCount}강</span>
         </div>
 
         <div className="mt-auto flex items-end justify-between pt-4">

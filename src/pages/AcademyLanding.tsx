@@ -2,13 +2,17 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CATEGORIES } from '../data/mock'
 import { useBizData } from '../lib/useBizData'
+import { useAuth } from '../lib/auth'
 import CourseCard from '../components/CourseCard'
 import CourseCarousel from '../components/CourseCarousel'
 import EbookCard from '../components/EbookCard'
-import { PROMO_BANNERS, pseudoRating, maskName } from '../data/mockMarketplace'
+import { maskName, type PromoBanner } from '../data/mockMarketplace'
 
 export default function AcademyLanding() {
-  const { courses, getCourse, courseReviews, ebooks, loading } = useBizData()
+  const { session } = useAuth()
+  const { courses, getCourse, courseReviews, ebooks, banners, loading } = useBizData()
+  // 무료로 시작하기: 로그인 → 컨텐츠(무료 필터), 비로그인 → 로그인 페이지
+  const startFreeTo = session ? '/content?free=1' : '/auth'
 
   const best = [...courses].sort((a, b) => b.studentCount - a.studentCount)
   const free = courses.filter((c) => c.price === 0)
@@ -17,12 +21,12 @@ export default function AcademyLanding() {
   const tickerReviews = courseReviews
     .filter((r) => !r.hidden)
     .map((r) => ({
-    id: r.id,
-    name: maskName(r.userName),
-    rating: pseudoRating(r.id),
-    course: getCourse(r.courseId)?.title ?? '',
-    text: r.content,
-  }))
+      id: r.id,
+      name: maskName(r.userName),
+      rating: r.rating ?? 0,
+      course: getCourse(r.courseId)?.title ?? '',
+      text: r.content,
+    }))
 
   return (
     <div>
@@ -35,7 +39,7 @@ export default function AcademyLanding() {
           마케팅·상권분석·연금·경영까지 — 현장 전문가의 비즈니스 강의
         </p>
         <div className="mt-7">
-          <BannerCarousel />
+          <BannerCarousel banners={banners} />
         </div>
       </section>
 
@@ -58,10 +62,12 @@ export default function AcademyLanding() {
       </Section>
 
       {/* 3. 실시간 베스트 */}
-      <Section divider>
-        <SectionHeader title="실시간 베스트" desc="관장님들이 가장 많이 찾는 강의" moreTo="/library" />
-        {loading ? <CarouselSkeleton /> : <CourseCarousel courses={best} />}
-      </Section>
+      {(loading || best.length > 0) && (
+        <Section divider>
+          <SectionHeader title="실시간 베스트" desc="관장님들이 가장 많이 찾는 강의" moreTo="/library" />
+          {loading ? <CarouselSkeleton /> : <CourseCarousel courses={best} />}
+        </Section>
+      )}
 
       {/* 4. 무료 베스트 */}
       {free.length > 0 && (
@@ -72,30 +78,34 @@ export default function AcademyLanding() {
       )}
 
       {/* 5. 최신 강의 */}
-      <Section divider>
-        <SectionHeader title="최신 강의" desc="새로 올라온 강의를 만나보세요" moreTo="/library" />
-        {loading ? (
-          <GridSkeleton />
-        ) : (
-          <div className="mt-2 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {latest.map((c) => (
-              <CourseCard key={c.id} course={c} />
-            ))}
-          </div>
-        )}
-      </Section>
+      {(loading || latest.length > 0) && (
+        <Section divider>
+          <SectionHeader title="최신 강의" desc="새로 올라온 강의를 만나보세요" moreTo="/library" />
+          {loading ? (
+            <GridSkeleton />
+          ) : (
+            <div className="mt-2 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {latest.map((c) => (
+                <CourseCard key={c.id} course={c} />
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
 
       {/* 6. 인기 전자책 */}
-      <Section divider>
-        <SectionHeader title="인기 전자책" desc="바로 읽는 체육관 경영 가이드" moreTo="/ebooks" />
-        <div className="no-scrollbar -mx-4 mt-2 flex snap-x gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6">
-          {ebooks.map((e) => (
-            <div key={e.id} className="w-64 shrink-0 snap-start sm:w-72">
-              <EbookCard ebook={e} />
-            </div>
-          ))}
-        </div>
-      </Section>
+      {ebooks.length > 0 && (
+        <Section divider>
+          <SectionHeader title="인기 전자책" desc="바로 읽는 체육관 경영 가이드" moreTo="/ebooks" />
+          <div className="no-scrollbar -mx-4 mt-2 flex snap-x gap-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6">
+            {ebooks.map((e) => (
+              <div key={e.id} className="w-64 shrink-0 snap-start sm:w-72">
+                <EbookCard ebook={e} />
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* 7. 실시간 후기 (마퀴) */}
       {tickerReviews.length > 0 && (
@@ -110,7 +120,7 @@ export default function AcademyLanding() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-800">{r.name}</span>
-                    <span className="text-amber-400">{'★'.repeat(r.rating)}</span>
+                    {r.rating > 0 && <span className="text-amber-400">{'★'.repeat(r.rating)}</span>}
                   </div>
                   {r.course && <div className="mt-1 text-xs text-violet-600">{r.course}</div>}
                   <p className="mt-2 line-clamp-2 text-sm text-slate-600">{r.text}</p>
@@ -123,14 +133,14 @@ export default function AcademyLanding() {
 
       {/* CTA */}
       <section className="px-4 pb-16 pt-12 sm:px-6">
-        <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 to-purple-600 px-6 py-12 text-center text-white sm:px-12">
-          <h2 className="text-2xl font-black sm:text-3xl">체육관 경영, 이제 혼자 고민하지 마세요</h2>
-          <p className="mx-auto mt-3 max-w-xl text-white/85">
+        <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl border border-violet-100 bg-violet-50 px-6 py-12 text-center sm:px-12">
+          <h2 className="text-2xl font-black text-zinc-900 sm:text-3xl">체육관 경영, 이제 혼자 고민하지 마세요</h2>
+          <p className="mx-auto mt-3 max-w-xl text-zinc-600">
             지금 가입하면 무료 강의부터 바로 시청할 수 있어요.
           </p>
           <Link
-            to="/library"
-            className="mt-7 inline-block rounded-xl bg-white px-8 py-3 font-bold text-violet-700 hover:bg-white/90"
+            to={startFreeTo}
+            className="mt-7 inline-block rounded-xl bg-zinc-900 px-8 py-3 font-bold text-white hover:bg-zinc-800"
           >
             무료로 시작하기
           </Link>
@@ -141,14 +151,17 @@ export default function AcademyLanding() {
 }
 
 /* ── 자동 슬라이드 배너 ── */
-function BannerCarousel() {
+function BannerCarousel({ banners }: { banners: PromoBanner[] }) {
   const [idx, setIdx] = useState(0)
-  const n = PROMO_BANNERS.length
+  const n = banners.length
 
   useEffect(() => {
+    if (n <= 1) return
     const t = setInterval(() => setIdx((i) => (i + 1) % n), 4500)
     return () => clearInterval(t)
   }, [n])
+
+  if (n === 0) return null
 
   return (
     <div className="group relative overflow-hidden rounded-2xl">
@@ -156,20 +169,8 @@ function BannerCarousel() {
         className="flex transition-transform duration-700 ease-out"
         style={{ transform: `translateX(-${idx * 100}%)` }}
       >
-        {PROMO_BANNERS.map((b) => (
-          <div
-            key={b.title}
-            className={`relative flex min-h-[180px] min-w-full flex-col justify-center bg-gradient-to-br ${b.gradient} p-7 text-white sm:min-h-[220px] sm:p-10`}
-          >
-            <h2 className="text-xl font-black sm:text-2xl">{b.title}</h2>
-            <p className="mt-1 max-w-sm text-sm text-white/85">{b.subtitle}</p>
-            <button className="mt-5 w-fit rounded-xl bg-white/95 px-5 py-2.5 text-sm font-bold text-slate-900 hover:bg-white">
-              {b.cta} →
-            </button>
-            <span className="pointer-events-none absolute -right-6 -top-8 text-[120px] opacity-15">
-              🎓
-            </span>
-          </div>
+        {banners.map((b, i) => (
+          <BannerSlide key={b.id ?? `${b.title}-${i}`} banner={b} />
         ))}
       </div>
 
@@ -191,7 +192,7 @@ function BannerCarousel() {
 
       {/* 인디케이터 점 */}
       <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
-        {PROMO_BANNERS.map((_, i) => (
+        {banners.map((_, i) => (
           <button
             key={i}
             onClick={() => setIdx(i)}
@@ -203,6 +204,36 @@ function BannerCarousel() {
         ))}
       </div>
     </div>
+  )
+}
+
+/* 배너 한 장 — link가 있으면 내부 라우트(Link) / 외부 URL(a)로 이동 */
+function BannerSlide({ banner: b }: { banner: PromoBanner }) {
+  const inner = (
+    <>
+      <h2 className="text-xl font-black sm:text-2xl">{b.title}</h2>
+      <p className="mt-1 max-w-sm text-sm text-white/85">{b.subtitle}</p>
+      {b.cta && (
+        <span className="mt-5 w-fit rounded-xl bg-white/95 px-5 py-2.5 text-sm font-bold text-slate-900 transition group-hover:bg-white">
+          {b.cta} →
+        </span>
+      )}
+      <span className="pointer-events-none absolute -right-6 -top-8 text-[120px] opacity-15">🎓</span>
+    </>
+  )
+  const cls = `relative flex min-h-[180px] min-w-full flex-col justify-center bg-gradient-to-br ${b.gradient} p-7 text-white sm:min-h-[220px] sm:p-10`
+
+  if (!b.link) return <div className={cls}>{inner}</div>
+  if (b.link.startsWith('/'))
+    return (
+      <Link to={b.link} className={cls}>
+        {inner}
+      </Link>
+    )
+  return (
+    <a href={b.link} target="_blank" rel="noopener noreferrer" className={cls}>
+      {inner}
+    </a>
   )
 }
 

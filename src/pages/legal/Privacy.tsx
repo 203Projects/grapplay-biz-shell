@@ -87,7 +87,7 @@ export default function Privacy() {
 
       <Section heading="8. 개인정보 보호책임자">
         <p>회사는 개인정보 처리에 관한 업무를 총괄하고 정보주체의 불만처리 및 피해구제를 위해 아래와 같이 보호책임자를 지정합니다:</p>
-        <UL items={['성명: 이바름 (대표)', '이메일: coach0179@naver.com', '전화: 02-599-6315']} />
+        <UL items={['성명: 이바름 (대표)', '이메일: grapplay.com@gmail.com', '전화: 02-599-6315']} />
       </Section>
 
       <Section heading="9. 개인정보의 안전성 확보 조치">

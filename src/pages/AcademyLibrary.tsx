@@ -16,8 +16,11 @@ export default function AcademyLibrary() {
     initialCat && CATEGORIES.some((c) => c.key === initialCat) ? (initialCat as Category) : '전체'
   const [filter, setFilter] = useState<Filter>(validCat)
   const [sort, setSort] = useState<Sort>('추천순')
+  const [freeOnly, setFreeOnly] = useState(params.get('free') === '1')
 
-  let list = courses.filter((c) => filter === '전체' || c.category === filter)
+  let list = courses.filter(
+    (c) => (filter === '전체' || c.category === filter) && (!freeOnly || c.price === 0),
+  )
 
   list = [...list].sort((a, b) => {
     if (sort === '판매순') return b.studentCount - a.studentCount
@@ -47,7 +50,7 @@ export default function AcademyLibrary() {
         ))}
       </div>
 
-      {/* 정렬 (추천순 / 판매순 / 최신순) */}
+      {/* 정렬 (추천순 / 판매순 / 최신순) + 무료 */}
       <div className="mt-5 flex items-center gap-4 border-b border-slate-200 pb-2">
         {SORTS.map((s) => (
           <button
@@ -60,6 +63,15 @@ export default function AcademyLibrary() {
             {s}
           </button>
         ))}
+        <button
+          onClick={() => setFreeOnly((v) => !v)}
+          aria-pressed={freeOnly}
+          className={`ml-auto flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold transition ${
+            freeOnly ? 'bg-emerald-600 text-white' : 'text-emerald-600 hover:bg-emerald-50'
+          }`}
+        >
+          {freeOnly ? '✓ ' : ''}무료
+        </button>
       </div>
 
       {/* 결과 */}

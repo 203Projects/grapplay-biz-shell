@@ -79,7 +79,7 @@ export default function PaymentSuccess() {
           <div className="mt-8 flex flex-col gap-2">
             <Link
               to={readUrl}
-              className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-500 px-6 py-3 font-bold text-white hover:opacity-90"
+              className="rounded-xl bg-zinc-900 px-6 py-3 font-bold text-white hover:bg-zinc-800"
             >
               {type === 'course' ? '바로 수강하기' : '바로 읽기'}
             </Link>

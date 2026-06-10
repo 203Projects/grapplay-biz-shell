@@ -6,22 +6,27 @@ import {
   getMyEnrollments,
   getMyWishlist,
   getMyOrders,
+  updateMyProfile,
   type EnrollmentRow,
   type WishlistRow,
   type OrderRow,
 } from '../lib/userData'
+import { uploadToCovers } from '../lib/storage'
 import { formatPrice } from '../data/mock'
+import ExpertProfileEditor from '../components/ExpertProfileEditor'
 
-type Tab = '수강 중' | '관심 강의' | '주문/결제'
+type Tab = '수강 중' | '관심 강의' | '주문/결제' | '프로필'
 const TAB_BY_PARAM: Record<string, Tab> = {
   enrolled: '수강 중',
   wishlist: '관심 강의',
   orders: '주문/결제',
+  profile: '프로필',
 }
 const PARAM_BY_TAB: Record<Tab, string> = {
   '수강 중': 'enrolled',
   '관심 강의': 'wishlist',
   '주문/결제': 'orders',
+  '프로필': 'profile',
 }
 
 export default function AcademyMyPage() {
@@ -61,9 +66,17 @@ export default function AcademyMyPage() {
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       {/* 프로필 헤더 */}
       <div className="flex items-center gap-4 rounded-3xl border border-stone-200 bg-white p-6">
-        <div className="grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-2xl font-black text-white">
-          {name.charAt(0)}
-        </div>
+        {profile?.avatar_url ? (
+          <img
+            src={profile.avatar_url}
+            alt=""
+            className="h-16 w-16 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-2xl font-black text-white">
+            {name.charAt(0)}
+          </div>
+        )}
         <div className="min-w-0">
           <h1 className="text-xl font-black text-stone-900">{name}님, 환영합니다</h1>
           <p className="truncate text-sm text-stone-500">{user?.email}</p>
@@ -82,7 +95,7 @@ export default function AcademyMyPage() {
 
       {/* 탭 */}
       <div className="mt-8 flex gap-1 border-b border-stone-200">
-        {(['수강 중', '관심 강의', '주문/결제'] as Tab[]).map((t) => (
+        {(['수강 중', '관심 강의', '주문/결제', '프로필'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -103,6 +116,8 @@ export default function AcademyMyPage() {
             <div key={i} className="h-28 animate-pulse rounded-2xl bg-stone-100" />
           ))}
         </div>
+      ) : tab === '프로필' ? (
+        <ProfileTab />
       ) : tab === '주문/결제' ? (
         <OrdersTab orders={orders} getCourse={getCourse} getEbook={getEbook} />
       ) : (
@@ -283,6 +298,100 @@ function OrdersTab({
           })}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+// 프로필 편집 — 모든 회원: 이름/사진. 전문가: 공개 프로필(직함/소개/사진/분야)도 함께.
+function ProfileTab() {
+  const { user, profile, refreshProfile } = useAuth()
+  const { getExpert, refetch } = useBizData()
+  const expert = profile?.expert_id ? getExpert(profile.expert_id) : undefined
+
+  // 공통(회원) 프로필
+  const [displayName, setDisplayName] = useState(profile?.display_name ?? '')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null)
+  const [savingUser, setSavingUser] = useState(false)
+  const [uploadingUser, setUploadingUser] = useState(false)
+
+  const uploadUserPhoto = async (file: File) => {
+    if (!user) return
+    setUploadingUser(true)
+    const { url, error } = await uploadToCovers(file, 'avatars')
+    setUploadingUser(false)
+    if (error || !url) return alert('사진 업로드 실패: ' + (error ?? '오류'))
+    setAvatarUrl(url)
+  }
+
+  const saveUser = async () => {
+    if (!user) return
+    setSavingUser(true)
+    const { error } = await updateMyProfile(user.id, {
+      display_name: displayName.trim(),
+      avatar_url: avatarUrl,
+    })
+    setSavingUser(false)
+    if (error) return alert('저장 실패: ' + error)
+    await refreshProfile()
+    alert('프로필을 저장했어요.')
+  }
+
+  const field = 'w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-amber-400'
+
+  return (
+    <div className="mt-8 max-w-2xl space-y-8">
+      {/* 회원 프로필 */}
+      <section className="space-y-4 rounded-2xl border border-stone-200 bg-white p-6">
+        <h2 className="font-black text-stone-900">내 프로필</h2>
+        <div className="flex items-center gap-4">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover" />
+          ) : (
+            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-2xl font-black text-white">
+              {(displayName || '관').charAt(0)}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <label className="cursor-pointer rounded-lg bg-stone-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-stone-800">
+              {uploadingUser ? '업로드 중…' : '사진 변경'}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && uploadUserPhoto(e.target.files[0])}
+              />
+            </label>
+            {avatarUrl && (
+              <button
+                onClick={() => setAvatarUrl(null)}
+                className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-50"
+              >
+                제거
+              </button>
+            )}
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-stone-500">이름</label>
+          <input className={field} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="이름" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-stone-500">이메일 (변경 불가)</label>
+          <input className={`${field} bg-stone-50 text-stone-400`} value={user?.email ?? ''} disabled />
+        </div>
+        <button
+          onClick={saveUser}
+          disabled={savingUser}
+          className="rounded-lg bg-amber-500 px-5 py-2 text-sm font-bold text-white hover:bg-amber-600 disabled:opacity-50"
+        >
+          프로필 저장
+        </button>
+      </section>
+
+      {/* 전문가 공개 프로필 (전문가만) */}
+      {profile?.role === 'expert' && profile.expert_id && (
+        <ExpertProfileEditor expertId={profile.expert_id} initial={expert} onSaved={refetch} />
+      )}
     </div>
   )
 }

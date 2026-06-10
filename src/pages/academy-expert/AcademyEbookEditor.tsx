@@ -8,11 +8,17 @@ import { createEbook, updateEbook, type EbookInput } from '../../lib/expertApi'
 import { CATEGORIES, type Category } from '../../data/mock'
 import type { Ebook } from '../../data/mockEbooks'
 
+import BlockStyleToolbar, { type BlockStyle } from '../../components/BlockStyleToolbar'
+
 type BlockType = 'heading' | 'text' | 'image'
 interface Block {
   id: number
   type: BlockType
   value: string
+  size?: BlockStyle['size']
+  weight?: BlockStyle['weight']
+  color?: BlockStyle['color']
+  align?: BlockStyle['align']
 }
 let blockSeq = 200
 
@@ -139,6 +145,9 @@ function EditorForm({ existing, isEdit }: { existing?: Ebook; isEdit: boolean })
   }
   function updateBlock(bid: number, value: string) {
     setBlocks((b) => b.map((x) => (x.id === bid ? { ...x, value } : x)))
+  }
+  function updateBlockStyle(bid: number, patch: BlockStyle) {
+    setBlocks((b) => b.map((x) => (x.id === bid ? { ...x, ...patch } : x)))
   }
   function removeBlock(bid: number) {
     setBlocks((b) => b.filter((x) => x.id !== bid))
@@ -514,20 +523,28 @@ function EditorForm({ existing, isEdit }: { existing?: Ebook; isEdit: boolean })
                       </label>
                     </div>
                   ) : b.type === 'heading' ? (
-                    <input
-                      value={b.value}
-                      onChange={(e) => updateBlock(b.id, e.target.value)}
-                      placeholder="제목"
-                      className="w-full rounded-lg border border-stone-200 px-3 py-2 text-lg font-bold outline-none focus:border-amber-400"
-                    />
+                    <div className="space-y-2">
+                      <BlockStyleToolbar value={b} onChange={(patch) => updateBlockStyle(b.id, patch)} />
+                      <input
+                        value={b.value}
+                        onChange={(e) => updateBlock(b.id, e.target.value)}
+                        placeholder="제목"
+                        style={b.color ? { color: b.color } : undefined}
+                        className="w-full rounded-lg border border-stone-200 px-3 py-2 text-lg font-bold outline-none focus:border-amber-400"
+                      />
+                    </div>
                   ) : (
-                    <textarea
-                      value={b.value}
-                      onChange={(e) => updateBlock(b.id, e.target.value)}
-                      placeholder="본문"
-                      rows={3}
-                      className="w-full resize-none rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-amber-400"
-                    />
+                    <div className="space-y-2">
+                      <BlockStyleToolbar value={b} onChange={(patch) => updateBlockStyle(b.id, patch)} />
+                      <textarea
+                        value={b.value}
+                        onChange={(e) => updateBlock(b.id, e.target.value)}
+                        placeholder="본문"
+                        rows={3}
+                        style={b.color ? { color: b.color } : undefined}
+                        className="w-full resize-none rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-amber-400"
+                      />
+                    </div>
                   )}
                 </div>
               ))}
@@ -551,7 +568,7 @@ function EditorForm({ existing, isEdit }: { existing?: Ebook; isEdit: boolean })
         <button
           onClick={handleSave}
           disabled={saving}
-          className="rounded-lg bg-gradient-to-r from-violet-600 to-purple-500 px-6 py-2.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50"
+          className="rounded-lg bg-zinc-900 px-6 py-2.5 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-50"
         >
           {saving ? '저장 중…' : isEdit ? '변경사항 저장' : '전자책 등록'}
         </button>

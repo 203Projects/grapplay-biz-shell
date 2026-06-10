@@ -13,6 +13,7 @@ interface HubItem {
   kind: 'course' | 'ebook'
   id: string
   category?: Category
+  price: number
   popularity: number
   order: number
   node: React.ReactNode
@@ -27,12 +28,14 @@ export default function ContentHub() {
 
   const [cat, setCat] = useState<'전체' | Category>(validCat)
   const [sort, setSort] = useState<Sort>('추천순')
+  const [freeOnly, setFreeOnly] = useState(params.get('free') === '1')
 
   const items: HubItem[] = [
     ...courses.map((c, i) => ({
       kind: 'course' as const,
       id: c.id,
       category: c.category,
+      price: c.price,
       popularity: c.studentCount,
       order: i,
       node: <CardWithBadge label="강의"><CourseCard course={c} /></CardWithBadge>,
@@ -41,13 +44,16 @@ export default function ContentHub() {
       kind: 'ebook' as const,
       id: e.id,
       category: e.category,
+      price: e.price,
       popularity: e.buyerCount,
       order: i,
       node: <CardWithBadge label="전자책"><EbookCard ebook={e} /></CardWithBadge>,
     })),
   ]
 
-  let list = items.filter((it) => cat === '전체' || it.category === cat)
+  let list = items.filter(
+    (it) => (cat === '전체' || it.category === cat) && (!freeOnly || it.price === 0),
+  )
 
   list = [...list].sort((a, b) => {
     if (sort === '판매순') return b.popularity - a.popularity
@@ -75,7 +81,7 @@ export default function ContentHub() {
         ))}
       </div>
 
-      {/* 정렬 (추천순 / 판매순 / 최신순) */}
+      {/* 정렬 (추천순 / 판매순 / 최신순) + 무료 */}
       <div className="mt-5 flex items-center gap-4 border-b border-slate-200 pb-2">
         {SORTS.map((s) => (
           <button
@@ -88,6 +94,15 @@ export default function ContentHub() {
             {s}
           </button>
         ))}
+        <button
+          onClick={() => setFreeOnly((v) => !v)}
+          aria-pressed={freeOnly}
+          className={`ml-auto flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold transition ${
+            freeOnly ? 'bg-emerald-600 text-white' : 'text-emerald-600 hover:bg-emerald-50'
+          }`}
+        >
+          {freeOnly ? '✓ ' : ''}무료
+        </button>
       </div>
 
       {/* 그리드 */}

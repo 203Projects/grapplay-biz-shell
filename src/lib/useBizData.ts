@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { fetchBizData, type BizData } from './api'
 import type { Course, Expert, ExpertReview, CourseReview } from '../data/mock'
-import type { Ebook } from '../data/mockEbooks'
+import type { Ebook, EbookReview } from '../data/mockEbooks'
 
 // 모듈 레벨 캐시 — 앱 내에서 한 번만 로드
 let cache: BizData | null = null
@@ -35,6 +35,10 @@ export interface BizDataApi extends BizData {
   getCourseReviews: (courseId: string) => CourseReview[]
   getEbook: (id: string) => Ebook | undefined
   getEbooksByExpert: (expertId: string) => Ebook[]
+  getEbookReviews: (ebookId: string) => EbookReview[]
+  // 실제 후기 별점에서 산출한 평점/개수 (고정 mock rating 대체)
+  getCourseRating: (courseId: string) => { rating: number; count: number }
+  getEbookRating: (ebookId: string) => { rating: number; count: number }
   getExpertStats: (expertId: string) => {
     rating: number
     reviewCount: number
@@ -50,6 +54,8 @@ const EMPTY: BizData = {
   expertReviews: [],
   courseReviews: [],
   ebooks: [],
+  ebookReviews: [],
+  banners: [],
   live: false,
 }
 
@@ -91,15 +97,42 @@ export function useBizData(): BizDataApi {
     getCourseReviews: (courseId) => d.courseReviews.filter((r) => r.courseId === courseId),
     getEbook: (id) => d.ebooks.find((e) => e.id === id),
     getEbooksByExpert: (expertId) => d.ebooks.filter((e) => e.expertId === expertId),
+    getEbookReviews: (ebookId) => d.ebookReviews.filter((r) => r.ebookId === ebookId),
+    getCourseRating: (courseId) => {
+      const rs = d.courseReviews.filter(
+        (r) => r.courseId === courseId && !r.hidden && typeof r.rating === 'number',
+      )
+      const count = rs.length
+      const rating = count ? rs.reduce((s, r) => s + (r.rating ?? 0), 0) / count : 0
+      return { rating, count }
+    },
+    getEbookRating: (ebookId) => {
+      const rs = d.ebookReviews.filter(
+        (r) => r.ebookId === ebookId && !r.hidden && typeof r.rating === 'number',
+      )
+      const count = rs.length
+      const rating = count ? rs.reduce((s, r) => s + (r.rating ?? 0), 0) / count : 0
+      return { rating, count }
+    },
     getExpertStats: (expertId) => {
-      const reviews = d.expertReviews.filter((r) => r.expertId === expertId)
       const courses = d.courses.filter((c) => c.expertId === expertId)
-      const avg = reviews.length
-        ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
-        : 0
+      const ebooks = d.ebooks.filter((e) => e.expertId === expertId)
+      const courseIds = new Set(courses.map((c) => c.id))
+      const ebookIds = new Set(ebooks.map((e) => e.id))
+      // 실제 후기 별점에서 산출 (가짜 expert_reviews 고정값 대체) — 강의+전자책 후기 통합
+      const ratings = [
+        ...d.courseReviews
+          .filter((r) => courseIds.has(r.courseId) && !r.hidden && typeof r.rating === 'number')
+          .map((r) => r.rating as number),
+        ...d.ebookReviews
+          .filter((r) => ebookIds.has(r.ebookId) && !r.hidden && typeof r.rating === 'number')
+          .map((r) => r.rating as number),
+      ]
+      const reviewCount = ratings.length
+      const avg = reviewCount ? ratings.reduce((s, n) => s + n, 0) / reviewCount : 0
       return {
         rating: avg,
-        reviewCount: reviews.length,
+        reviewCount,
         courseCount: courses.length,
         studentCount: courses.reduce((s, c) => s + c.studentCount, 0),
         categories: Array.from(new Set(courses.map((c) => c.category))),

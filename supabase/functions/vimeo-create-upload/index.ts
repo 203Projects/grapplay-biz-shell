@@ -62,7 +62,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         upload: { approach: 'tus', size },
         name: name || `course-video-${Date.now()}`,
-        privacy: { view: 'unlisted', embed: 'public' },
+        // view: 'disable' = Vimeo.com 공개 페이지 없음(임베드 전용). 우클릭 "Vimeo에서 보기" 차단. (Plus 이상 필요)
+        privacy: { view: 'disable', embed: 'public' },
       }),
     })
     const data = await vimeoRes.json()

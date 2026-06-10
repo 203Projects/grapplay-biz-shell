@@ -99,7 +99,7 @@ export default function AuthPage() {
         <button
           type="submit"
           disabled={busy || !configured}
-          className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-purple-500 px-4 py-3 font-semibold text-white hover:opacity-90 disabled:opacity-50"
+          className="w-full rounded-xl bg-zinc-900 px-4 py-3 font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
         >
           {busy ? '처리 중…' : mode === 'login' ? '로그인' : '회원가입'}
         </button>
