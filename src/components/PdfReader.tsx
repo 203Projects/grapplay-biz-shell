@@ -10,18 +10,28 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc
 export default function PdfReader({
   url,
   watermark,
+  initialPercent = 0,
+  onProgress,
 }: {
   url: string
   watermark?: string
+  initialPercent?: number
+  onProgress?: (percent: number) => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  // 콜백/초기값은 ref로 보관 — effect가 매 렌더 재실행(PDF 전체 재렌더)되지 않도록 deps에서 제외
+  const onProgressRef = useRef(onProgress)
+  onProgressRef.current = onProgress
+  const initialPercentRef = useRef(initialPercent)
+  initialPercentRef.current = initialPercent
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
     let cancelled = false
+    let observer: IntersectionObserver | null = null
     container.innerHTML = ''
     setLoading(true)
     setError(false)
@@ -30,7 +40,9 @@ export default function PdfReader({
     task.promise
       .then(async (pdf) => {
         if (cancelled) return
-        for (let p = 1; p <= pdf.numPages; p++) {
+        const numPages = pdf.numPages
+        const canvases: HTMLCanvasElement[] = []
+        for (let p = 1; p <= numPages; p++) {
           const page = await pdf.getPage(p)
           if (cancelled) return
           const viewport = page.getViewport({ scale: 1.5 })
@@ -38,6 +50,7 @@ export default function PdfReader({
           canvas.width = viewport.width
           canvas.height = viewport.height
           canvas.className = 'mx-auto mb-4 block w-full max-w-3xl rounded-lg shadow-lg'
+          canvas.dataset.page = String(p)
           // 드래그로 이미지 저장 방지
           canvas.style.userSelect = 'none'
           ;(canvas.style as CSSStyleDeclaration & { webkitUserSelect?: string }).webkitUserSelect =
@@ -45,11 +58,42 @@ export default function PdfReader({
           const ctx = canvas.getContext('2d')
           if (!ctx) continue
           container.appendChild(canvas)
+          canvases.push(canvas)
           await page.render({ canvas, canvasContext: ctx, viewport }).promise
           if (cancelled) return
           drawWatermark(ctx, canvas.width, canvas.height, watermark ?? '')
         }
-        if (!cancelled) setLoading(false)
+        if (cancelled) return
+        setLoading(false)
+
+        // 이어읽기: 저장된 퍼센트 → 페이지로 환산해 스크롤
+        const startPct = initialPercentRef.current
+        if (startPct > 0) {
+          const target = Math.min(numPages, Math.max(1, Math.round((startPct / 100) * numPages)))
+          canvases[target - 1]?.scrollIntoView({ block: 'start' })
+        }
+
+        // 현재 보고 있는 페이지 추적 → 퍼센트 보고(부모에서 디바운스 저장)
+        const ratios = new Map<number, number>()
+        observer = new IntersectionObserver(
+          (entries) => {
+            for (const e of entries) {
+              const pg = Number((e.target as HTMLElement).dataset.page)
+              ratios.set(pg, e.isIntersecting ? e.intersectionRatio : 0)
+            }
+            let best = 0
+            let bestRatio = 0
+            for (const [pg, r] of ratios) {
+              if (r > bestRatio) {
+                bestRatio = r
+                best = pg
+              }
+            }
+            if (best > 0) onProgressRef.current?.(Math.round((best / numPages) * 100))
+          },
+          { threshold: [0.1, 0.5, 0.9] },
+        )
+        canvases.forEach((c) => observer!.observe(c))
       })
       .catch(() => {
         if (!cancelled) {
@@ -60,6 +104,7 @@ export default function PdfReader({
 
     return () => {
       cancelled = true
+      observer?.disconnect()
       task.destroy()
     }
   }, [url, watermark])

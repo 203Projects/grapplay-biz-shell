@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, Navigate, Link } from 'react-router-dom'
 import { useBizData } from '../lib/useBizData'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import PdfReader from '../components/PdfReader'
 import { watermarkText } from '../lib/pdfWatermark'
+import { updateProgress } from '../lib/userData'
 
 const NOTICES = [
   '전자책은 마이페이지 > 내 강의에서 다시 열람할 수 있습니다.',
@@ -19,6 +20,11 @@ export default function AcademyEbookRead() {
   const ebook = getEbook(id ?? '')
 
   const [enrolled, setEnrolled] = useState<boolean | null>(null)
+  // 읽기 진도(%) — enrollments.progress 재활용. 이어읽기 + 상단 표시용.
+  const [savedPct, setSavedPct] = useState<number | null>(null)
+  const [displayPct, setDisplayPct] = useState(0)
+  const bestRef = useRef(0) // 최고 도달 퍼센트(되돌아가도 진도는 안 줄임)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!user || !supabase || !id) {
@@ -28,16 +34,40 @@ export default function AcademyEbookRead() {
     let active = true
     supabase
       .from('enrollments')
-      .select('item_id')
+      .select('item_id, progress')
       .eq('user_id', user.id)
       .eq('item_type', 'ebook')
       .eq('item_id', id)
       .maybeSingle()
       .then(({ data }) => {
-        if (active) setEnrolled(!!data)
+        if (!active) return
+        setEnrolled(!!data)
+        const p = (data?.progress as number) ?? 0
+        bestRef.current = p
+        setSavedPct(p)
+        setDisplayPct(p)
       })
     return () => {
       active = false
+    }
+  }, [user, id])
+
+  // 페이지 이동 시 호출 — 최고 진도 갱신 + 1.5초 디바운스 저장
+  const handleProgress = (pct: number) => {
+    if (pct <= bestRef.current) return
+    bestRef.current = pct
+    setDisplayPct(pct)
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      if (user && id) updateProgress(user.id, 'ebook', id, pct)
+    }, 1500)
+  }
+
+  // 화면을 떠날 때 마지막 진도 즉시 저장
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      if (user && id && bestRef.current > 0) updateProgress(user.id, 'ebook', id, bestRef.current)
     }
   }, [user, id])
 
@@ -74,13 +104,21 @@ export default function AcademyEbookRead() {
           ←
         </Link>
         <span className="truncate font-bold">{ebook.title}</span>
-        <span className="ml-auto shrink-0 text-sm text-white/50">{ebook.pageCount}쪽</span>
+        <span className="ml-auto shrink-0 text-sm text-white/50">
+          {displayPct > 0 ? `${displayPct}% 읽음 · ` : ''}
+          {ebook.pageCount}쪽
+        </span>
       </div>
 
       {/* PDF 뷰어 — 다운로드 불가(canvas 렌더) + 워터마크 */}
       <div className="mx-auto max-w-5xl px-4 pb-6 sm:px-6">
         <div className="overflow-hidden rounded-2xl border border-white/10">
-          <PdfReader url={ebook.pdfUrl} watermark={watermarkText(user?.email)} />
+          <PdfReader
+            url={ebook.pdfUrl}
+            watermark={watermarkText(user?.email)}
+            initialPercent={savedPct ?? 0}
+            onProgress={handleProgress}
+          />
         </div>
 
         <ul className="mt-4 space-y-1.5 text-xs text-white/50">

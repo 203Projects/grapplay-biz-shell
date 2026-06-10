@@ -174,6 +174,7 @@ function ItemsTab({
         if (row.item_type === 'ebook') {
           const eb = getEbook(row.item_id)
           if (!eb) return null
+          const progress = 'progress' in row ? row.progress : 0
           return (
             <Link
               key={`ebook-${row.item_id}`}
@@ -191,10 +192,21 @@ function ItemsTab({
                 <p className="text-xs text-stone-500">
                   {eb.avatar} {eb.author}
                 </p>
+                {showProgress && (
+                  <div className="mt-3 flex items-center gap-3">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-stone-100">
+                      <div
+                        className="h-full rounded-full bg-violet-600"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-medium text-stone-500">{progress}%</span>
+                  </div>
+                )}
               </div>
               <div className="hidden items-center sm:flex">
                 <span className="rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white">
-                  보기
+                  {showProgress ? '이어읽기' : '보기'}
                 </span>
               </div>
             </Link>

@@ -1,9 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, Navigate, Link } from 'react-router-dom'
 import { useBizData } from '../lib/useBizData'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { toEmbedUrl, fetchVimeoPortrait } from '../lib/video'
+import VimeoPlayer from '../components/VimeoPlayer'
+import { getCourseProgress, saveCourseProgress, type LessonProgress } from '../lib/userData'
+
+// 전체 진도(%) = 영상 있는 회차들의 시청 비율 평균. 90% 이상 본 회차는 1로 간주.
+function calcPct(ls: LessonProgress, curriculum: { videoUrl?: string }[]): number {
+  const vids = curriculum.filter((l) => l.videoUrl)
+  if (!vids.length) return 0
+  let watched = 0
+  curriculum.forEach((l, i) => {
+    const p = ls[i]
+    if (l.videoUrl && p && p.d > 0) watched += Math.min(p.s / p.d, 1)
+  })
+  return Math.round((watched / vids.length) * 100)
+}
 
 type Tab = '내용' | '목차' | '공지'
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -28,6 +42,13 @@ export default function AcademyCourseLearn() {
   const [idx, setIdx] = useState(0)
   const [tab, setTab] = useState<Tab>('내용')
   const [portrait, setPortrait] = useState(false)
+  // 회차별 재생 위치(진도) — lessonProg, 저장/언마운트용 ref
+  const [lessonProg, setLessonProg] = useState<LessonProgress>({})
+  const lessonsRef = useRef<LessonProgress>({})
+  const courseRef = useRef(course)
+  courseRef.current = course
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resumedRef = useRef(false)
 
   // 현재 레슨 영상이 세로면 9:16 가운데 정렬, 아니면 기본 16:9
   const lessonUrl = course?.curriculum[idx]?.videoUrl
@@ -63,6 +84,55 @@ export default function AcademyCourseLearn() {
     }
   }, [user, id])
 
+  // 진도 로드 + 이어볼 회차 선택(가장 마지막으로 본 회차)
+  useEffect(() => {
+    if (!user || !id || enrolled !== true) return
+    let active = true
+    getCourseProgress(user.id, id).then(({ lessons: ls }) => {
+      if (!active) return
+      lessonsRef.current = ls
+      setLessonProg(ls)
+      if (!resumedRef.current) {
+        resumedRef.current = true
+        const keys = Object.keys(ls)
+          .map(Number)
+          .filter((k) => (ls[k]?.s ?? 0) > 0)
+        if (keys.length) setIdx(Math.max(...keys))
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [user, id, enrolled])
+
+  // 재생 위치 보고 → 회차별 + 전체% 저장(4초 디바운스)
+  const handleTime = (seconds: number, duration: number) => {
+    const next: LessonProgress = {
+      ...lessonsRef.current,
+      [idx]: { s: Math.round(seconds), d: Math.round(duration) },
+    }
+    lessonsRef.current = next
+    setLessonProg(next)
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      const cur = courseRef.current
+      if (user && id && cur) {
+        saveCourseProgress(user.id, id, lessonsRef.current, calcPct(lessonsRef.current, cur.curriculum))
+      }
+    }, 4000)
+  }
+
+  // 화면 이탈 시 마지막 진도 저장
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      const cur = courseRef.current
+      if (user && id && cur && Object.keys(lessonsRef.current).length) {
+        saveCourseProgress(user.id, id, lessonsRef.current, calcPct(lessonsRef.current, cur.curriculum))
+      }
+    }
+  }, [user, id])
+
   if (loading || enrolled === null) {
     return (
       <div className="grid min-h-[60vh] place-items-center">
@@ -92,6 +162,7 @@ export default function AcademyCourseLearn() {
   const lessons = course.curriculum
   const current = lessons[idx]
   const embed = toEmbedUrl(current?.videoUrl)
+  const pct = calcPct(lessonProg, course.curriculum)
 
   return (
     <div className="bg-stone-900 text-white">
@@ -101,6 +172,7 @@ export default function AcademyCourseLearn() {
           ←
         </Link>
         <span className="truncate font-bold">{course.title}</span>
+        <span className="ml-auto shrink-0 text-sm text-white/50">{pct}% 수강</span>
       </div>
 
       {/* 영상 */}
@@ -114,14 +186,23 @@ export default function AcademyCourseLearn() {
             }
           >
             {embed ? (
-              <iframe
-                key={embed}
-                src={embed}
-                title={current?.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="h-full w-full"
-              />
+              /player\.vimeo\.com/.test(embed) ? (
+                <VimeoPlayer
+                  embed={embed}
+                  startSeconds={lessonProg[idx]?.s ?? 0}
+                  onTime={handleTime}
+                  title={current?.title}
+                />
+              ) : (
+                <iframe
+                  key={embed}
+                  src={embed}
+                  title={current?.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="h-full w-full"
+                />
+              )
             ) : (
               <div className="grid h-full place-items-center bg-stone-800 text-sm text-white/50">
                 🎬 이 레슨은 아직 영상이 등록되지 않았어요
@@ -215,11 +296,16 @@ export default function AcademyCourseLearn() {
                   <span className="flex-1 truncate text-sm font-medium text-slate-700">
                     {l.title}
                   </span>
-                  {l.videoUrl ? (
-                    <span className="text-slate-400">▶</span>
-                  ) : (
-                    <span className="text-xs text-slate-300">준비중</span>
-                  )}
+                  {(() => {
+                    const p = lessonProg[i]
+                    const done = !!p && p.d > 0 && p.s / p.d >= 0.9
+                    if (done) return <span className="font-bold text-emerald-500">✓</span>
+                    return l.videoUrl ? (
+                      <span className="text-slate-400">▶</span>
+                    ) : (
+                      <span className="text-xs text-slate-300">준비중</span>
+                    )
+                  })()}
                 </button>
               ))}
             </div>

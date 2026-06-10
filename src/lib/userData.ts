@@ -147,6 +147,63 @@ export async function removeWishlist(userId: string, type: ItemType, id: string)
   return { error: error?.message ?? null }
 }
 
+// 영상강의 회차별 재생 위치 — { "<lessonIdx>": { s: 마지막위치초, d: 영상길이초 } }
+export interface LessonPos {
+  s: number
+  d: number
+}
+export type LessonProgress = Record<string, LessonPos>
+
+// 강의 진도 조회 — 전체 %(progress) + 회차별 위치(lesson_progress)
+export async function getCourseProgress(
+  userId: string,
+  courseId: string,
+): Promise<{ progress: number; lessons: LessonProgress }> {
+  if (!supabase) return { progress: 0, lessons: {} }
+  const { data } = await supabase
+    .from('enrollments')
+    .select('progress, lesson_progress')
+    .eq('user_id', userId)
+    .eq('item_type', 'course')
+    .eq('item_id', courseId)
+    .maybeSingle()
+  return {
+    progress: (data?.progress as number) ?? 0,
+    lessons: (data?.lesson_progress as LessonProgress) ?? {},
+  }
+}
+
+// 강의 진도 저장 — 회차별 위치 + 전체 % 동시 업데이트(RLS "update own progress")
+export async function saveCourseProgress(
+  userId: string,
+  courseId: string,
+  lessons: LessonProgress,
+  progressPct: number,
+) {
+  if (!supabase) return { error: '로그인이 필요합니다.' }
+  const pct = Math.max(0, Math.min(100, Math.round(progressPct)))
+  const { error } = await supabase
+    .from('enrollments')
+    .update({ progress: pct, lesson_progress: lessons })
+    .eq('user_id', userId)
+    .eq('item_type', 'course')
+    .eq('item_id', courseId)
+  return { error: error?.message ?? null }
+}
+
+// 읽기/학습 진도(0~100%) 저장 — enrollments.progress 재활용. RLS "update own progress"로 본인 행만 허용.
+export async function updateProgress(userId: string, type: ItemType, id: string, progress: number) {
+  if (!supabase) return { error: '로그인이 필요합니다.' }
+  const pct = Math.max(0, Math.min(100, Math.round(progress)))
+  const { error } = await supabase
+    .from('enrollments')
+    .update({ progress: pct })
+    .eq('user_id', userId)
+    .eq('item_type', type)
+    .eq('item_id', id)
+  return { error: error?.message ?? null }
+}
+
 // 무료 강의/전자책 즉시 수강 등록 (RLS가 price=0만 허용)
 export async function enrollFree(userId: string, type: ItemType, id: string) {
   if (!supabase) return { error: '로그인이 필요합니다.' }
