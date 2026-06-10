@@ -5,12 +5,14 @@ export default function ExpertAvatar({
   size = 32,
   className = '',
   rounded = 'rounded-full',
+  fallbackBg = 'bg-amber-100',
 }: {
   emoji?: string | null
   src?: string | null
   size?: number
   className?: string
   rounded?: string
+  fallbackBg?: string
 }) {
   const px = `${size}px`
   if (src) {
@@ -26,7 +28,7 @@ export default function ExpertAvatar({
   return (
     <span
       style={{ width: px, height: px, fontSize: `${Math.round(size * 0.55)}px` }}
-      className={`grid shrink-0 place-items-center ${rounded} bg-amber-100 ${className}`}
+      className={`grid shrink-0 place-items-center ${rounded} ${fallbackBg} ${className}`}
     >
       {emoji || '🧑‍🏫'}
     </span>

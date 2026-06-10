@@ -9,6 +9,7 @@ import { enrollFree, addEbookReview } from '../lib/userData'
 import { EXPERT_CREDENTIALS } from '../data/mockMarketplace'
 import { ebookDiscountPct } from '../data/mockEbooks'
 import EbookCard from '../components/EbookCard'
+import ExpertAvatar from '../components/ExpertAvatar'
 import PdfPreview from '../components/PdfPreview'
 import ReviewSection from '../components/ReviewSection'
 
@@ -290,9 +291,12 @@ export default function AcademyEbookDetail() {
           <h2 className="text-xl font-black text-slate-900">저자소개</h2>
           <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-6">
             <div className="flex items-start gap-4">
-              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-violet-100 text-4xl">
-                {ebook.avatar}
-              </div>
+              <ExpertAvatar
+                emoji={ebook.avatar}
+                src={authorExpert?.avatarUrl}
+                size={64}
+                fallbackBg="bg-violet-100"
+              />
               <div>
                 <h3 className="text-lg font-bold text-slate-900">{ebook.author}</h3>
                 {authorExpert && (

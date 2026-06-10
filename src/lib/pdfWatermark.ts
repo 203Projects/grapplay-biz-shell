@@ -7,16 +7,17 @@ export function drawWatermark(
 ) {
   if (!text) return
   ctx.save()
-  ctx.globalAlpha = 0.1
+  ctx.globalAlpha = 0.05
   ctx.fillStyle = '#475569'
-  const font = Math.max(14, Math.round(width / 30))
-  ctx.font = `600 ${font}px sans-serif`
+  const font = Math.max(13, Math.round(width / 42))
+  ctx.font = `500 ${font}px sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.translate(width / 2, height / 2)
   ctx.rotate(-Math.PI / 6)
-  const stepX = Math.max(220, width / 2)
-  const stepY = Math.max(120, height / 6)
+  // 타일 간격을 넓혀 반복 수를 이전의 1/3 수준으로 — 읽기 방해 최소화, 추적은 유지
+  const stepX = Math.max(360, width / 1.5)
+  const stepY = Math.max(260, height / 3)
   for (let y = -height; y <= height; y += stepY) {
     for (let x = -width; x <= width; x += stepX) {
       ctx.fillText(text, x, y)
@@ -25,9 +26,7 @@ export function drawWatermark(
   ctx.restore()
 }
 
-// 워터마크 문구 — 사용자 이메일 + 열람일시
+// 워터마크 문구 — 구매자 이메일(유출 시 누구인지 특정). 날짜는 추적에 불필요해 제외.
 export function watermarkText(email?: string | null): string {
-  const who = email || '구매자 본인'
-  const today = new Date().toISOString().slice(0, 10)
-  return `${who} · ${today}`
+  return email || '구매자 본인'
 }

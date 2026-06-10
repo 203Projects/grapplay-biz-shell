@@ -11,6 +11,7 @@ import { toEmbedUrl, fetchVimeoPortrait } from '../lib/video'
 import CourseCard from '../components/CourseCard'
 import PurchaseBar from '../components/PurchaseBar'
 import ReviewSection from '../components/ReviewSection'
+import ExpertAvatar from '../components/ExpertAvatar'
 import { Stars } from '../components/Stars'
 import { getCourseMeta, discountPct, EXPERT_CREDENTIALS } from '../data/mockMarketplace'
 
@@ -271,9 +272,12 @@ export default function AcademyCourseDetail() {
           <h2 className="text-xl font-black text-slate-900">강사소개</h2>
           <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-6">
             <div className="flex items-start gap-4">
-              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-violet-100 text-4xl">
-                {expert?.avatar}
-              </div>
+              <ExpertAvatar
+                emoji={expert?.avatar}
+                src={expert?.avatarUrl}
+                size={64}
+                fallbackBg="bg-violet-100"
+              />
               <div>
                 <h3 className="text-lg font-bold text-slate-900">{expert?.name}</h3>
                 <p className="text-sm font-medium text-violet-600">{expert?.title}</p>
