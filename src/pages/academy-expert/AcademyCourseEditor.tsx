@@ -63,6 +63,7 @@ function EditorForm({ existing, isEdit }: { existing?: Course; isEdit: boolean }
   const [subtitle, setSubtitle] = useState(existing?.subtitle ?? '')
   const [category, setCategory] = useState<Category>(existing?.category ?? '마케팅')
   const [price, setPrice] = useState(String(existing?.price ?? 0))
+  const [originalPrice, setOriginalPrice] = useState(String(existing?.originalPrice ?? ''))
   const [coverImage, setCoverImage] = useState(existing?.coverImage ?? '')
   const [coverUploading, setCoverUploading] = useState(false)
 
@@ -90,7 +91,8 @@ function EditorForm({ existing, isEdit }: { existing?: Course; isEdit: boolean }
     existing?.whatYouLearn?.length ? existing.whatYouLearn : [''],
   )
 
-  const [pdfName, setPdfName] = useState<string>('')
+  const [pdfUrl, setPdfUrl] = useState<string>(existing?.reviewRewardPdfUrl ?? '')
+  const [pdfUploading, setPdfUploading] = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -133,6 +135,24 @@ function EditorForm({ existing, isEdit }: { existing?: Course; isEdit: boolean }
         return n
       })
     }
+  }
+
+  async function handlePdfUpload(file: File) {
+    if (!supabase) return
+    setError(null)
+    setPdfUploading(true)
+    const path = `course-pdfs/${crypto.randomUUID()}.pdf`
+    const { error: upErr } = await supabase.storage
+      .from('covers')
+      .upload(path, file, { upsert: true, contentType: 'application/pdf' })
+    if (upErr) {
+      setPdfUploading(false)
+      setError('PDF 업로드 실패: ' + upErr.message)
+      return
+    }
+    const { data } = supabase.storage.from('covers').getPublicUrl(path)
+    setPdfUrl(data.publicUrl)
+    setPdfUploading(false)
   }
 
   const [blockUploading, setBlockUploading] = useState<Record<number, boolean>>({})
@@ -194,12 +214,13 @@ function EditorForm({ existing, isEdit }: { existing?: Course; isEdit: boolean }
       subtitle: subtitle.trim(),
       category,
       price: Number(price) || 0,
+      originalPrice: originalPrice ? Number(originalPrice) : null,
       coverImage: coverImage || null,
       curriculum,
       whatYouLearn: learn.map((t) => t.trim()).filter(Boolean),
       useLandingPage: useLanding,
       detailBlocks: blocks,
-      rewardPdfUrl: pdfName || null,
+      rewardPdfUrl: pdfUrl.trim() || null,
     }
 
     setSaving(true)
@@ -316,30 +337,53 @@ function EditorForm({ existing, isEdit }: { existing?: Course; isEdit: boolean }
 
         {/* 가격 */}
         <Section title="가격">
-          <Field label="판매 가격 (원)">
-            <div className="relative max-w-xs">
-              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-400">
-                ₩
-              </span>
-              <input
-                value={price}
-                onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ''))}
-                inputMode="numeric"
-                className="w-full rounded-xl border border-stone-300 py-2.5 pl-8 pr-4 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-              />
-            </div>
-            {Number(price) > 0 ? (
-              <p className="mt-2 text-xs text-stone-500">
-                정산 예상액(80%):{' '}
-                <span className="font-semibold text-stone-700">
-                  ₩{Math.round(Number(price) * 0.8).toLocaleString()}
-                </span>{' '}
-                · 판매가 ₩{Number(price).toLocaleString()}
-              </p>
-            ) : (
-              <p className="mt-2 text-xs text-stone-500">0원으로 두면 무료 강의로 공개됩니다.</p>
-            )}
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="판매 가격 (원)">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-400">
+                  ₩
+                </span>
+                <input
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ''))}
+                  inputMode="numeric"
+                  className="w-full rounded-xl border border-stone-300 py-2.5 pl-8 pr-4 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                />
+              </div>
+            </Field>
+            <Field label="정가 (선택 — 할인 표시)">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-stone-400">
+                  ₩
+                </span>
+                <input
+                  value={originalPrice}
+                  onChange={(e) => setOriginalPrice(e.target.value.replace(/[^0-9]/g, ''))}
+                  inputMode="numeric"
+                  placeholder="할인 전 가격"
+                  className="w-full rounded-xl border border-stone-300 py-2.5 pl-8 pr-4 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                />
+              </div>
+            </Field>
+          </div>
+          {Number(price) > 0 ? (
+            <p className="text-xs text-stone-500">
+              정산 예상액(80%):{' '}
+              <span className="font-semibold text-stone-700">
+                ₩{Math.round(Number(price) * 0.8).toLocaleString()}
+              </span>{' '}
+              · 판매가 ₩{Number(price).toLocaleString()}
+              {Number(originalPrice) > Number(price) && (
+                <>
+                  {' '}
+                  · 정가 ₩{Number(originalPrice).toLocaleString()} (
+                  {Math.round((1 - Number(price) / Number(originalPrice)) * 100)}% 할인)
+                </>
+              )}
+            </p>
+          ) : (
+            <p className="text-xs text-stone-500">0원으로 두면 무료 강의로 공개됩니다.</p>
+          )}
         </Section>
 
         {/* 커리큘럼 */}
@@ -586,23 +630,54 @@ function EditorForm({ existing, isEdit }: { existing?: Course; isEdit: boolean }
             수강생이 리뷰를 남기면 보내줄 PDF를 강의별로 등록하세요. (전문가가 직접 발송)
           </p>
           <div className="mt-3 flex items-center gap-3 rounded-xl border border-stone-200 bg-white p-4">
-            <div className="grid h-10 w-10 place-items-center rounded-lg bg-indigo-100 text-lg">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-indigo-100 text-lg">
               📄
             </div>
-            <div className="flex-1 text-sm">
-              {pdfName ? (
-                <span className="font-medium text-stone-800">{pdfName}</span>
+            <div className="min-w-0 flex-1 text-sm">
+              {pdfUrl ? (
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block truncate font-medium text-indigo-600 hover:underline"
+                >
+                  {decodeURIComponent(pdfUrl.split('/').pop() ?? 'PDF')}
+                </a>
               ) : (
                 <span className="text-stone-400">등록된 PDF가 없습니다.</span>
               )}
             </div>
-            <button
-              onClick={() => setPdfName('리뷰_리워드_가이드.pdf')}
-              className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50"
-            >
-              PDF 업로드
-            </button>
+            {pdfUrl && (
+              <button
+                onClick={() => setPdfUrl('')}
+                className="text-xs text-rose-500 hover:underline"
+              >
+                제거
+              </button>
+            )}
+            <label className="cursor-pointer rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50">
+              {pdfUploading ? '업로드 중…' : 'PDF 업로드'}
+              <input
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                disabled={pdfUploading}
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) handlePdfUpload(f)
+                  e.target.value = ''
+                }}
+              />
+            </label>
           </div>
+          <Field label="또는 PDF URL 직접 입력">
+            <input
+              value={pdfUrl}
+              onChange={(e) => setPdfUrl(e.target.value)}
+              placeholder="https://…"
+              className="w-full rounded-xl border border-stone-300 px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+            />
+          </Field>
         </Section>
       </div>
 

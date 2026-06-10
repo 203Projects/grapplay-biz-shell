@@ -10,6 +10,7 @@ export interface CourseInput {
   subtitle: string
   category: Category
   price: number
+  originalPrice?: number | null
   cover?: string
   coverImage?: string | null
   thumbEmoji?: string
@@ -42,6 +43,7 @@ export async function createCourse(input: CourseInput) {
     subtitle: input.subtitle,
     category: input.category,
     price: input.price,
+    original_price: input.originalPrice ?? null,
     cover,
     cover_image: input.coverImage ?? null,
     thumb_emoji: input.thumbEmoji || '📚',
@@ -65,6 +67,7 @@ export async function updateCourse(id: string, input: CourseInput) {
     subtitle: input.subtitle,
     category: input.category,
     price: input.price,
+    original_price: input.originalPrice ?? null,
     cover_image: input.coverImage ?? null,
     lesson_count: input.curriculum.length,
     duration_min: input.curriculum.reduce((s, c) => s + (c.durationMin || 0), 0),

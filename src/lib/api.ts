@@ -34,6 +34,7 @@ function mapCourse(r: any): Course {
     category: r.category,
     expertId: r.expert_id,
     price: r.price,
+    originalPrice: r.original_price ?? undefined,
     isSubscriptionExcluded: r.is_subscription_excluded,
     cover: r.cover,
     coverImage: r.cover_image ?? undefined,
@@ -48,6 +49,7 @@ function mapCourse(r: any): Course {
     whatYouLearn: r.what_you_learn ?? [],
     useLandingPage: r.use_landing_page ?? false,
     detailBlocks: r.detail_blocks ?? [],
+    reviewRewardPdfUrl: r.review_reward_pdf_url ?? undefined,
   }
 }
 

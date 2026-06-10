@@ -382,7 +382,8 @@ function PurchaseCard({
   const [busy, setBusy] = useState(false)
 
   const meta = getCourseMeta(course.id)
-  const off = discountPct(course.price, meta.originalPrice)
+  const originalPrice = course.originalPrice ?? meta.originalPrice
+  const off = discountPct(course.price, originalPrice)
   const isPaid = course.price > 0
   const wished = isWished('course', course.id)
 
@@ -452,7 +453,7 @@ function PurchaseCard({
           <>
             <span className="text-lg font-bold text-rose-500">{off}%</span>
             <span className="mb-0.5 text-sm text-slate-400 line-through">
-              ₩{meta.originalPrice!.toLocaleString()}
+              ₩{originalPrice!.toLocaleString()}
             </span>
           </>
         )}

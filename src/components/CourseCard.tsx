@@ -8,7 +8,8 @@ export default function CourseCard({ course }: { course: Course }) {
   const wished = isWished('course', course.id)
   const isPaid = course.price > 0
   const meta = getCourseMeta(course.id)
-  const off = discountPct(course.price, meta.originalPrice)
+  const originalPrice = course.originalPrice ?? meta.originalPrice
+  const off = discountPct(course.price, originalPrice)
 
   return (
     <Link
@@ -71,7 +72,7 @@ export default function CourseCard({ course }: { course: Course }) {
               <div className="flex items-center gap-1.5 text-xs">
                 <span className="font-bold text-rose-500">{off}%</span>
                 <span className="text-slate-400 line-through">
-                  ₩{meta.originalPrice!.toLocaleString()}
+                  ₩{originalPrice!.toLocaleString()}
                 </span>
               </div>
             )}
