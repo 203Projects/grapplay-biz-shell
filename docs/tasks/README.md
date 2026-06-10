@@ -14,6 +14,7 @@
 | 6 | [06-list-search-filters.md](./06-list-search-filters.md) | ⑦ 강의/전자책/전문가 **페이지 내부 검색 제거** + 전자책 `category` 컬럼 추가(A) | 목록 필터 |
 | 7 | [07-global-search.md](./07-global-search.md) | ⑧ 통합 검색 페이지(강의·전자책·전문가 종류별) — 유일한 검색 경로 | 신규 페이지·검색 |
 | 8 | [08-content-hub.md](./08-content-hub.md) | ⑨ **컨텐츠 허브** `/content`: 강의+전자책 통합(카테고리·타입·정렬, pudufu 식) — **모바일 하단 "컨텐츠"** 진입 | 신규 페이지 |
+| 9 | [09-admin-upload-pdf-discount.md](./09-admin-upload-pdf-discount.md) | (2026-06-10) 관리자 영상 업로드 권한(엣지 함수), 강의 리뷰리워드 **PDF 실제 업로드**, 강의 **할인가(original_price)** 설정·표시 | 버그수정·기능 |
 
 ### 확정된 결정
 - 작업 ①: 카테고리 **"체육관 운영" → "경영"**, DB 컬럼/시드/기존 행까지 변경(A안).
