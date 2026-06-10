@@ -38,8 +38,11 @@ Deno.serve(async (req) => {
       .select('role, expert_id')
       .eq('id', user.id)
       .maybeSingle()
-    if (!profile || profile.role !== 'expert' || !profile.expert_id) {
-      return json({ ok: false, message: '전문가만 업로드할 수 있습니다.' }, 403)
+    // 전문가는 본인 강의에, 관리자는 모든 지도자 강의에 업로드 가능
+    const isExpert = profile?.role === 'expert' && !!profile?.expert_id
+    const isAdmin = profile?.role === 'admin'
+    if (!isExpert && !isAdmin) {
+      return json({ ok: false, message: '전문가 또는 관리자만 업로드할 수 있습니다.' }, 403)
     }
 
     // 2) 입력
