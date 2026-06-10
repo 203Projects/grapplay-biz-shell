@@ -109,7 +109,7 @@ export default function UsersTab() {
                                 if (confirm(`${u.email} 님을 관리자로 지정할까요?`)) changeRole(u, 'admin')
                               }}
                               disabled={busy}
-                              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+                              className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
                             >
                               관리자 지정
                             </button>

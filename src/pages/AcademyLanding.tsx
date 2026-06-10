@@ -140,7 +140,7 @@ export default function AcademyLanding() {
           </p>
           <Link
             to={startFreeTo}
-            className="mt-7 inline-block rounded-xl bg-zinc-900 px-8 py-3 font-bold text-white hover:bg-zinc-800"
+            className="mt-7 inline-block rounded-xl bg-violet-600 px-8 py-3 font-bold text-white hover:bg-violet-700"
           >
             무료로 시작하기
           </Link>

@@ -568,7 +568,7 @@ function EditorForm({ existing, isEdit }: { existing?: Ebook; isEdit: boolean })
         <button
           onClick={handleSave}
           disabled={saving}
-          className="rounded-lg bg-zinc-900 px-6 py-2.5 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-50"
+          className="rounded-lg bg-violet-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50"
         >
           {saving ? '저장 중…' : isEdit ? '변경사항 저장' : '전자책 등록'}
         </button>

@@ -54,7 +54,7 @@ export default function AcademyEbookRead() {
       <div className="mx-auto max-w-2xl px-4 py-24 text-center">
         <div className="text-5xl">🤔</div>
         <h1 className="mt-4 text-2xl font-bold text-slate-900">전자책을 찾을 수 없어요</h1>
-        <Link to="/ebooks" className="mt-6 inline-block rounded-xl bg-zinc-900 px-6 py-3 font-semibold text-white hover:bg-zinc-800">
+        <Link to="/ebooks" className="mt-6 inline-block rounded-xl bg-violet-600 px-6 py-3 font-semibold text-white hover:bg-violet-700">
           전자책 목록으로
         </Link>
       </div>

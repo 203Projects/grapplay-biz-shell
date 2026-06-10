@@ -20,6 +20,22 @@ export function toEmbedUrl(url?: string): string | null {
   return u // 그 외(직접 mp4 등)는 그대로
 }
 
+// Vimeo oEmbed로 영상 길이(초) 조회. 실패(판별 불가·네트워크 오류 등)면 null.
+export async function fetchVimeoDuration(url?: string): Promise<number | null> {
+  if (!url) return null
+  const m = url.match(/vimeo\.com\/(?:video\/)?(\d+)(?:[/?](?:h=)?(\w+))?/)
+  if (!m) return null
+  const page = m[2] ? `https://vimeo.com/${m[1]}/${m[2]}` : `https://vimeo.com/${m[1]}`
+  try {
+    const res = await fetch(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(page)}`)
+    if (!res.ok) return null
+    const data = await res.json()
+    return typeof data.duration === 'number' ? data.duration : null
+  } catch {
+    return null
+  }
+}
+
 // Vimeo oEmbed로 영상 가로/세로 판별. 세로(9:16 등)면 true, 가로면 false.
 // 판별 불가(YouTube·직접 링크·네트워크 오류 등)면 null → 호출부에서 기본(가로)로 처리.
 export async function fetchVimeoPortrait(url?: string): Promise<boolean | null> {

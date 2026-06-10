@@ -33,7 +33,7 @@ export default function ExpertsTab() {
         </p>
         <button
           onClick={() => setEditing('new')}
-          className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-bold text-white hover:bg-zinc-800"
+          className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700"
         >
           + 새 전문가
         </button>
@@ -251,7 +251,7 @@ function ExpertForm({
         <button
           onClick={save}
           disabled={busy}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+          className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
         >
           저장
         </button>

@@ -85,7 +85,7 @@ export default function ReviewsTab() {
             onClick={() => setKind(k)}
             className={`rounded-full px-4 py-1.5 text-sm font-bold transition ${
               kind === k
-                ? 'bg-zinc-900 text-white'
+                ? 'bg-violet-600 text-white'
                 : 'border border-stone-300 bg-white text-stone-600 hover:bg-stone-100'
             }`}
           >

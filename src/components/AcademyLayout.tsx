@@ -50,8 +50,9 @@ export default function AcademyLayout({ children }: { children: React.ReactNode 
         <div className="border-b border-slate-200 md:border-b-0">
           <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
             <Link to="/" className="shrink-0">
-              <span className="text-xl font-black tracking-tighter sm:text-2xl">
-                grapplay<span className="text-violet-600">-biz</span>
+              <span className="text-xl font-bold tracking-tighter sm:text-2xl">
+                <span className="font-brand">Grapplay</span>
+                <span className="font-brand text-violet-600">-biz</span>
               </span>
             </Link>
 
@@ -126,8 +127,9 @@ export default function AcademyLayout({ children }: { children: React.ReactNode 
         <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
           <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
             <div>
-              <span className="text-xl font-black tracking-tighter">
-                grapplay<span className="text-violet-600">-biz</span>
+              <span className="text-xl font-bold tracking-tighter">
+                <span className="font-brand">Grapplay</span>
+                <span className="font-brand text-violet-600">-biz</span>
               </span>
               <p className="mt-3 max-w-xs text-sm text-slate-500">
                 체육관 경영자와 지도자를 위한 비즈니스 교육 플랫폼.
@@ -191,7 +193,7 @@ function HeaderUtil() {
       <div className="ml-auto flex items-center gap-1 text-sm">
         <Link
           to="/auth"
-          className="rounded-lg bg-zinc-900 px-4 py-2 font-semibold text-white hover:bg-zinc-800"
+          className="rounded-lg bg-violet-600 px-4 py-2 font-semibold text-white hover:bg-violet-700"
         >
           로그인
         </Link>

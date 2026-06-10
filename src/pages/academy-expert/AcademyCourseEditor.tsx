@@ -5,6 +5,7 @@ import { useBizData, invalidateBizData } from '../../lib/useBizData'
 import { useAuth } from '../../lib/auth'
 import { createCourse, updateCourse, type CourseInput } from '../../lib/expertApi'
 import { uploadVideoToVimeo } from '../../lib/vimeo'
+import { fetchVimeoDuration } from '../../lib/video'
 import { supabase } from '../../lib/supabase'
 import { uploadToCovers } from '../../lib/storage'
 import BlockStyleToolbar, { type BlockStyle } from '../../components/BlockStyleToolbar'
@@ -207,14 +208,18 @@ function EditorForm({ existing, isEdit }: { existing?: Course; isEdit: boolean }
       setError('강의 제목을 입력해 주세요.')
       return
     }
-    const curriculum = lessons
-      .filter((l) => l.title.trim())
-      .map((l) => ({
-        title: l.title.trim(),
-        durationMin: 0,
-        videoUrl: l.videoUrl.trim() || undefined,
-        preview: l.preview,
-      }))
+    setSaving(true)
+    // 각 강의 영상 길이를 Vimeo에서 조회해 분 단위로 저장(커리큘럼 시간/총 강의시간 표시용).
+    const valid = lessons.filter((l) => l.title.trim())
+    const durations = await Promise.all(
+      valid.map((l) => fetchVimeoDuration(l.videoUrl.trim() || undefined)),
+    )
+    const curriculum = valid.map((l, i) => ({
+      title: l.title.trim(),
+      durationMin: durations[i] != null ? Math.max(1, Math.round(durations[i]! / 60)) : 0,
+      videoUrl: l.videoUrl.trim() || undefined,
+      preview: l.preview,
+    }))
 
     const input: CourseInput = {
       expertId: targetExpertId,
@@ -231,7 +236,6 @@ function EditorForm({ existing, isEdit }: { existing?: Course; isEdit: boolean }
       rewardPdfUrl: pdfUrl.trim() || null,
     }
 
-    setSaving(true)
     const res = isEdit ? await updateCourse(existing!.id, input) : await createCourse(input)
     setSaving(false)
     if (res.error) {

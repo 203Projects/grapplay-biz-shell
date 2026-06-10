@@ -86,7 +86,7 @@ export default function AcademyCourseDetail() {
         <h1 className="mt-4 text-2xl font-bold text-slate-900">강의를 찾을 수 없어요</h1>
         <Link
           to="/library"
-          className="mt-6 inline-block rounded-xl bg-zinc-900 px-6 py-3 font-semibold text-white hover:bg-zinc-800"
+          className="mt-6 inline-block rounded-xl bg-violet-600 px-6 py-3 font-semibold text-white hover:bg-violet-700"
         >
           강의 목록으로
         </Link>
@@ -134,9 +134,12 @@ export default function AcademyCourseDetail() {
               <p className="mt-1 text-slate-600">{course.subtitle}</p>
               {expert && (
                 <div className="mt-3 flex items-center gap-2 text-sm">
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-violet-100 text-base">
-                    {expert.avatar}
-                  </span>
+                  <ExpertAvatar
+                    emoji={expert.avatar}
+                    src={expert.avatarUrl}
+                    size={28}
+                    fallbackBg="bg-violet-100"
+                  />
                   <span className="font-semibold text-slate-700">{expert.name}</span>
                 </div>
               )}
@@ -236,7 +239,7 @@ export default function AcademyCourseDetail() {
                 >
                   <span
                     className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-bold ${
-                      isActive ? 'bg-zinc-900 text-white' : 'bg-slate-100 text-slate-500'
+                      isActive ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'
                     }`}
                   >
                     {i + 1}
@@ -475,7 +478,7 @@ function PurchaseCard({
       <button
         onClick={onPrimary}
         disabled={busy}
-        className="mt-5 w-full rounded-xl bg-zinc-900 py-3 font-bold text-white hover:bg-zinc-800 disabled:opacity-50"
+        className="mt-5 w-full rounded-xl bg-violet-600 py-3 font-bold text-white hover:bg-violet-700 disabled:opacity-50"
       >
         {enrolled ? '이어보기' : isPaid ? '구매하기' : busy ? '등록 중…' : '무료로 시청하기'}
       </button>

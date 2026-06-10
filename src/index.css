@@ -1,35 +1,38 @@
 @import "tailwindcss";
 
-/* 브랜드 보라 재정의: Tailwind 기본 violet/purple은 채도가 높아 다소 촌스러운 톤이라
-   채도를 낮춘 세련된 아이리스 보라로 교체한다. 해당 색 클래스를 쓰는 앱 전체가 한 번에
-   고급 톤으로 바뀐다(작은 포인트 액센트 용도). 1차 액션 버튼은 잉크(zinc-900)를 직접 사용.
+/* 브랜드 보라(grapplay 톤앤매너) — 단일 포인트 컬러.
+   화이트 미니멀 UI 위에 grapplay 계열 보라 하나만 액센트로 쓴다. 600(#6D28D9)이
+   1차 버튼/링크/활성 상태의 기준색. 화이트 배경에서 너무 쨍하지 않도록 기본 violet-600(#7c3aed)
+   보다 한 톤 깊게 잡았다. 그라데이션 없이 단색으로만 사용.
    주의: @theme 블록 안에는 커스텀 속성만 허용되므로 설명 주석은 블록 밖에 둔다. */
 @theme {
   --font-sans: "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
+  /* 로고 워드마크 전용 — grapplay.com과 동일하게 Inter 사용(라틴). font-brand 유틸로 적용 */
+  --font-brand: "Inter", ui-sans-serif, system-ui, sans-serif;
 
-  --color-violet-50: #f6f5fb;
-  --color-violet-100: #edebf7;
-  --color-violet-200: #dad5ef;
-  --color-violet-300: #bdb4e2;
-  --color-violet-400: #978bd2;
-  --color-violet-500: #6f62c4;
-  --color-violet-600: #5b4fb8;
-  --color-violet-700: #4a3f97;
-  --color-violet-800: #3a3175;
-  --color-violet-900: #2f285c;
-  --color-violet-950: #1e1939;
+  --color-violet-50: #f5f3ff;
+  --color-violet-100: #ede9fe;
+  --color-violet-200: #ddd6fe;
+  --color-violet-300: #c4b5fd;
+  --color-violet-400: #a78bfa;
+  --color-violet-500: #8b5cf6;
+  --color-violet-600: #6d28d9;
+  --color-violet-700: #5b21b6;
+  --color-violet-800: #4c1d95;
+  --color-violet-900: #3b1378;
+  --color-violet-950: #2e1065;
 
-  --color-purple-50: #f7f5fb;
-  --color-purple-100: #efebf7;
-  --color-purple-200: #e0d7f0;
-  --color-purple-300: #c8b8e4;
-  --color-purple-400: #a88fd6;
-  --color-purple-500: #8a6fca;
-  --color-purple-600: #7256bd;
-  --color-purple-700: #5d4699;
-  --color-purple-800: #483676;
-  --color-purple-900: #382a5c;
-  --color-purple-950: #241a3a;
+  --color-purple-50: #f5f3ff;
+  --color-purple-100: #ede9fe;
+  --color-purple-200: #ddd6fe;
+  --color-purple-300: #c4b5fd;
+  --color-purple-400: #a78bfa;
+  --color-purple-500: #8b5cf6;
+  --color-purple-600: #6d28d9;
+  --color-purple-700: #5b21b6;
+  --color-purple-800: #4c1d95;
+  --color-purple-900: #3b1378;
+  --color-purple-950: #2e1065;
 }
 
 html {

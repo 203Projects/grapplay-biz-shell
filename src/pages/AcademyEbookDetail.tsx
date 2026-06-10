@@ -64,7 +64,7 @@ export default function AcademyEbookDetail() {
         <h1 className="mt-4 text-2xl font-bold text-slate-900">전자책을 찾을 수 없어요</h1>
         <Link
           to="/ebooks"
-          className="mt-6 inline-block rounded-xl bg-zinc-900 px-6 py-3 font-semibold text-white hover:bg-zinc-800"
+          className="mt-6 inline-block rounded-xl bg-violet-600 px-6 py-3 font-semibold text-white hover:bg-violet-700"
         >
           전자책 목록으로
         </Link>
@@ -151,9 +151,12 @@ export default function AcademyEbookDetail() {
             <p className="mt-2 text-slate-600">{ebook.subtitle}</p>
 
             <div className="mt-4 flex items-center gap-2 text-sm">
-              <span className="grid h-7 w-7 place-items-center rounded-full bg-violet-100 text-base">
-                {ebook.avatar}
-              </span>
+              <ExpertAvatar
+                emoji={ebook.avatar}
+                src={authorExpert?.avatarUrl}
+                size={28}
+                fallbackBg="bg-violet-100"
+              />
               <span className="font-semibold text-slate-700">{ebook.author}</span>
             </div>
 
@@ -272,7 +275,7 @@ export default function AcademyEbookDetail() {
               <button
                 onClick={onPrimary}
                 disabled={busy}
-                className="mt-4 rounded-xl bg-zinc-900 px-6 py-2.5 font-bold text-white hover:bg-zinc-800 disabled:opacity-50"
+                className="mt-4 rounded-xl bg-violet-600 px-6 py-2.5 font-bold text-white hover:bg-violet-700 disabled:opacity-50"
               >
                 {canRead
                   ? '전체 읽기 →'
@@ -405,7 +408,7 @@ export default function AcademyEbookDetail() {
             <button
               onClick={onPrimary}
               disabled={busy}
-              className="h-11 rounded-xl bg-zinc-900 px-6 font-bold text-white hover:bg-zinc-800 disabled:opacity-50"
+              className="h-11 rounded-xl bg-violet-600 px-6 font-bold text-white hover:bg-violet-700 disabled:opacity-50"
             >
               {enrolled ? '바로 읽기' : isPaid ? '구매하기' : busy ? '등록 중…' : '무료로 읽기'}
             </button>

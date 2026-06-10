@@ -73,7 +73,7 @@ export default function ReviewSection({
           <button
             onClick={submit}
             disabled={busy}
-            className="mt-3 rounded-lg bg-zinc-900 px-5 py-2 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-50"
+            className="mt-3 rounded-lg bg-violet-600 px-5 py-2 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50"
           >
             후기 등록
           </button>
