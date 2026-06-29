@@ -3,7 +3,7 @@ import StaticPage, { Section, OL, UL } from './StaticPage'
 // 이용약관 — 그래플레이 본 약관(Terms.tsx) 차용, 비즈(단품)로 조정·구독 조항 제외
 export default function Terms() {
   return (
-    <StaticPage title="이용약관" updated="2026년 6월 9일">
+    <StaticPage title="이용약관" updated="2026년 7월 5일">
       <Section heading="제1조 (목적)">
         <p>
           본 약관은 그래플레이 비즈(이하 "회사")가 제공하는 체육관 경영자·지도자를 위한 비즈니스 교육
@@ -62,7 +62,16 @@ export default function Terms() {
           items={[
             '회사가 제공하는 유료 서비스의 요금은 서비스 화면에 명시된 금액으로 합니다.',
             '결제는 신용카드, 간편결제 등 회사가 제공하는 결제대행(토스페이먼츠)을 통해 진행됩니다.',
-            '강의·전자책 등 콘텐츠는 단품으로 구매하는 평생 소장 상품입니다. 단, 결제일로부터 1년은 유료 서비스 기간으로, 그 이후는 무료 서비스 제공 기간으로 구분됩니다. 무료 서비스 제공 기간 중에는 회사의 운영 정책에 따라 서비스가 변경되거나 종료될 수 있습니다.',
+            <>
+              강의·전자책 등 콘텐츠는 단품으로 구매하는 상품이며, 각 콘텐츠의 사용기한(이용 가능 기간)은
+              구매(결제완료)일로부터 <strong className="text-stone-700">최대 1년</strong>입니다. 구체적인
+              사용기한은 각 콘텐츠의 구매(상세) 화면에 명시되며, 별도의 표시가 없는 경우 1년이 적용됩니다.
+            </>,
+            <>
+              회원은 위 사용기한 동안 해당 콘텐츠를 <strong className="text-stone-700">무제한 시청</strong>할 수
+              있습니다(추가 비용 없음). 사용기한이 종료된 이후에는 해당 콘텐츠의 시청·열람이 제한될 수 있으며,
+              회사의 운영 정책에 따라 서비스가 변경되거나 종료될 수 있습니다.
+            </>,
           ]}
         />
       </Section>
@@ -145,7 +154,8 @@ export default function Terms() {
 
       <p className="border-t border-stone-200 pt-6 text-sm text-stone-400">
         <strong className="text-stone-500">부칙</strong>
-        <br />본 약관은 2026년 6월 9일부터 시행됩니다.
+        <br />이 약관은 2026년 7월 5일부터 시행됩니다.
+        <br />(2026년 6월 9일 제정 / 2026년 7월 5일 제6조 사용기한 조항 개정)
       </p>
     </StaticPage>
   )
